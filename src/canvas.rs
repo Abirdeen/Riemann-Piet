@@ -14,10 +14,10 @@ pub struct Colour {
 }
 
 impl Colour {
-    pub fn x(&self) -> usize {
+    fn x(&self) -> usize {
         self.x
     }
-    pub fn y(&self) -> usize {
+    fn y(&self) -> usize {
         self.y
     }
     pub fn light(&self) -> u8 {
@@ -26,10 +26,10 @@ impl Colour {
     pub fn block_size(&self) -> Option<i64> {
         self.block_size
     }
-    pub fn name(&self) -> &'static str {
+    fn name(&self) -> &'static str {
         self.name
     }
-    pub fn set_block_size(&mut self, new_size: i64) {
+    fn set_block_size(&mut self, new_size: i64) {
         self.block_size = Some(new_size);
         return
     }
