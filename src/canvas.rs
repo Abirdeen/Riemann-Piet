@@ -102,7 +102,7 @@ impl Codel {
         match self {
             Codel::White {x:_, y:_} => str_palette::WHITE,
             Codel::Black {x:_, y:_} => str_palette::BLACK,
-            Codel::Colour(color) => color.name()
+            Codel::Colour(colour) => colour.name()
         }
     }
 
