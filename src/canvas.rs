@@ -23,6 +23,9 @@ impl Colour {
     pub fn light(&self) -> u8 {
         self.light
     }
+    pub fn hue(&self) -> u8 {
+        self.hue
+    }
     pub fn block_size(&self) -> Option<i64> {
         self.block_size
     }
