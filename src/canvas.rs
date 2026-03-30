@@ -35,7 +35,7 @@ impl Colour {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Codel {
     Colour(Colour),
     White {
@@ -105,6 +105,33 @@ impl Codel {
             Codel::Colour(color) => color.name()
         }
     }
+
+    pub fn set_block_size(&mut self, new_size: i64) {
+        match self {
+            Codel::Colour(colour) => colour.set_block_size(new_size),
+            _ => ()
+        }
+    }
+
+    pub fn mark(&mut self) {
+        self.set_block_size(-1);
+    }
+
+    pub fn is_marked(&self) -> bool {
+        match self {
+            Codel::Colour(colour) if colour.block_size() == Some(-1) => true,
+            _ => false
+        }
+    }
+
+    pub fn block_size_is_none(&self) -> bool {
+        match self {
+            Codel::Colour(colour) if colour.block_size() == None => true,
+            _ => false
+        }
+    }
+
+
 }
 
 pub type CanvasError = Box<dyn std::error::Error + Send + Sync + 'static>;
