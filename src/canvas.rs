@@ -144,15 +144,16 @@ impl Codel {
 
 }
 
-
+pub type CanvasError = Box<dyn std::error::Error + Send + Sync + 'static>;
+pub type Canvas = Vec<Vec<Codel>>;
 
 mod canvas_utils {
     use crate::Codel;
     use image::GenericImageView;
     use crate::rgba_palette;
     use crate::str_palette;
-    pub type CanvasError = Box<dyn std::error::Error + Send + Sync + 'static>;
-    pub type Canvas = Vec<Vec<Codel>>;
+
+    use crate::canvas::{Canvas, CanvasError};
 
     mod block_size_utils {
         use crate::canvas::canvas_utils::Canvas;
@@ -275,6 +276,6 @@ mod canvas_utils {
 pub fn create_canvas(
         img_path: &'static str, 
         codel_size: u32
-    ) -> Result<canvas_utils::Canvas, canvas_utils::CanvasError> {
+    ) -> Result<Canvas, CanvasError> {
     canvas_utils::create_canvas(img_path, codel_size)
 }
