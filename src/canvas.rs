@@ -148,15 +148,14 @@ pub type CanvasError = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Canvas = Vec<Vec<Codel>>;
 
 mod canvas_utils {
-    use crate::Codel;
-    use image::GenericImageView;
+    use crate::{Codel, Canvas};
+    use crate::canvas::CanvasError;
     use crate::rgba_palette;
     use crate::str_palette;
-
-    use crate::canvas::{Canvas, CanvasError};
+    use image::{DynamicImage, GenericImageView};
 
     mod block_size_utils {
-        use crate::canvas::canvas_utils::Canvas;
+        use crate::Canvas;
 
         fn fill(canvas: &mut Canvas, x: usize, y: usize, colour_name: &str, counted_block: i64) -> i64 {
 
