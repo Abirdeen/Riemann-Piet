@@ -1,6 +1,5 @@
 extern crate image;
-use image::GenericImageView;
-use crate::rgba_palette;
+
 use crate::str_palette;
 
 #[derive(Debug, Clone, Copy)]
