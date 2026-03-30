@@ -131,6 +131,14 @@ impl Codel {
         }
     }
 
+    pub fn is_colour(&self, colour_name: &str) -> bool {
+        match self {
+            Codel::Black { x:_, y:_ } if colour_name == str_palette::BLACK => true,
+            Codel::White { x:_, y:_ } if colour_name == str_palette::WHITE => true,
+            Codel::Colour(colour) if colour_name == colour.name() => true,
+            _ => false
+        }
+    }
 
 }
 
