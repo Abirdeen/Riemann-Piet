@@ -241,17 +241,23 @@ mod canvas_utils {
         }
     }
 
+    fn scaled_dimensions(
+        image: &DynamicImage, 
+        codel_size: u32
+    ) -> Result<(u32, u32), CanvasError> {
+        let (unsc_width, unsc_height) = image.dimensions();
+        if (!unsc_width.is_multiple_of(codel_size)) || (!unsc_height.is_multiple_of(codel_size)) {
+            return Err("Codel size mismatch!".into())
+        };
+        return Ok((unsc_width/codel_size, unsc_height/codel_size))
+    }
+
     pub fn create_canvas(
         img_path: &'static str, 
         codel_size: u32
     ) -> Result<Canvas, CanvasError> {
         let image = image::open(img_path)?;
-
-        let (unsc_width, unsc_height) = image.dimensions();
-        if (!unsc_width.is_multiple_of(codel_size)) || (!unsc_height.is_multiple_of(codel_size)) {
-            return Err("Codel size mismatch!".into())
-        }
-        let (width, height) = (unsc_width/codel_size, unsc_height/codel_size);
+        let (width, height) = scaled_dimensions(&image, codel_size)?;
 
         let mut canvas: Canvas = Vec::new();
         for i in 0..width {
