@@ -146,7 +146,7 @@ impl Codel {
 
 
 
-pub mod canvas_utils {
+mod canvas_utils {
     use crate::Codel;
     use image::GenericImageView;
     use crate::rgba_palette;
@@ -270,4 +270,11 @@ pub mod canvas_utils {
 
         Ok(canvas)
     }
+}
+
+pub fn create_canvas(
+        img_path: &'static str, 
+        codel_size: u32
+    ) -> Result<canvas_utils::Canvas, canvas_utils::CanvasError> {
+    canvas_utils::create_canvas(img_path, codel_size)
 }
