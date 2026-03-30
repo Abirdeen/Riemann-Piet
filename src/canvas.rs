@@ -145,65 +145,73 @@ impl Codel {
 
 }
 
-pub type CanvasError = Box<dyn std::error::Error + Send + Sync + 'static>;
-pub type Canvas = Vec<Vec<Codel>>;
 
-fn codel_from_rgba_and_pos(colour: image::Rgba<u8>, x: usize, y: usize) -> Codel {
-    match colour {
-        rgba_palette::BLACK => Codel::new(x, y, str_palette::BLACK),
-        rgba_palette::WHITE => Codel::new(x, y, str_palette::WHITE),
 
-        rgba_palette::LIGHT_RED => Codel::new(x, y, str_palette::LR),
-        rgba_palette::RED => Codel::new(x, y, str_palette::R),
-        rgba_palette::DARK_RED => Codel::new(x, y, str_palette::DR),
+pub mod canvas_utils {
+    use crate::Codel;
+    use image::GenericImageView;
+    use crate::rgba_palette;
+    use crate::str_palette;
+    pub type CanvasError = Box<dyn std::error::Error + Send + Sync + 'static>;
+    pub type Canvas = Vec<Vec<Codel>>;
 
-        rgba_palette::LIGHT_YELLOW => Codel::new(x, y, str_palette::LY),
-        rgba_palette::YELLOW => Codel::new(x, y, str_palette::Y),
-        rgba_palette::DARK_YELLOW => Codel::new(x, y, str_palette::DY),
+    fn codel_from_rgba_and_pos(colour: image::Rgba<u8>, x: usize, y: usize) -> Codel {
+        match colour {
+            rgba_palette::BLACK => Codel::new(x, y, str_palette::BLACK),
+            rgba_palette::WHITE => Codel::new(x, y, str_palette::WHITE),
 
-        rgba_palette::LIGHT_GREEN => Codel::new(x, y, str_palette::LG),
-        rgba_palette::GREEN => Codel::new(x, y, str_palette::G),
-        rgba_palette::DARK_GREEN => Codel::new(x, y, str_palette::DG),
+            rgba_palette::LIGHT_RED => Codel::new(x, y, str_palette::LR),
+            rgba_palette::RED => Codel::new(x, y, str_palette::R),
+            rgba_palette::DARK_RED => Codel::new(x, y, str_palette::DR),
 
-        rgba_palette::LIGHT_CYAN => Codel::new(x, y, str_palette::LC),
-        rgba_palette::CYAN => Codel::new(x, y, str_palette::C),
-        rgba_palette::DARK_CYAN => Codel::new(x, y, str_palette::DC),
+            rgba_palette::LIGHT_YELLOW => Codel::new(x, y, str_palette::LY),
+            rgba_palette::YELLOW => Codel::new(x, y, str_palette::Y),
+            rgba_palette::DARK_YELLOW => Codel::new(x, y, str_palette::DY),
 
-        rgba_palette::LIGHT_BLUE => Codel::new(x, y, str_palette::LB),
-        rgba_palette::BLUE => Codel::new(x, y, str_palette::B),
-        rgba_palette::DARK_BLUE => Codel::new(x, y, str_palette::DB),
+            rgba_palette::LIGHT_GREEN => Codel::new(x, y, str_palette::LG),
+            rgba_palette::GREEN => Codel::new(x, y, str_palette::G),
+            rgba_palette::DARK_GREEN => Codel::new(x, y, str_palette::DG),
 
-        rgba_palette::LIGHT_MAGENTA => Codel::new(x, y, str_palette::LM),
-        rgba_palette::MAGENTA => Codel::new(x, y, str_palette::M),
-        rgba_palette::DARK_MAGENTA => Codel::new(x, y, str_palette::DM),
+            rgba_palette::LIGHT_CYAN => Codel::new(x, y, str_palette::LC),
+            rgba_palette::CYAN => Codel::new(x, y, str_palette::C),
+            rgba_palette::DARK_CYAN => Codel::new(x, y, str_palette::DC),
 
-        c => {println!("An unrecognised colour was detected: {:?}", c); Codel::new(x, y, str_palette::WHITE)}
-    }
-}
+            rgba_palette::LIGHT_BLUE => Codel::new(x, y, str_palette::LB),
+            rgba_palette::BLUE => Codel::new(x, y, str_palette::B),
+            rgba_palette::DARK_BLUE => Codel::new(x, y, str_palette::DB),
 
-pub fn create_canvas(
-    img_path: &'static str, 
-    codel_size: u32
-) -> Result<Canvas, CanvasError> {
-    let image = image::open(img_path)?;
+            rgba_palette::LIGHT_MAGENTA => Codel::new(x, y, str_palette::LM),
+            rgba_palette::MAGENTA => Codel::new(x, y, str_palette::M),
+            rgba_palette::DARK_MAGENTA => Codel::new(x, y, str_palette::DM),
 
-    let (unsc_width, unsc_height) = image.dimensions();
-    if (!unsc_width.is_multiple_of(codel_size)) || (!unsc_height.is_multiple_of(codel_size)) {
-        return Err("Codel size mismatch!".into())
-    }
-    let (width, height) = (unsc_width/codel_size, unsc_height/codel_size);
-
-    let mut canvas: Vec<Vec<Codel>> = Vec::new();
-    for i in 0..width {
-        let mut row: Vec<Codel> = Vec::new();
-        for j in 0..height {
-            let codel = codel_from_rgba_and_pos(
-                image.get_pixel(i*codel_size, j*codel_size), 
-                i as usize, 
-                j as usize);
-            row.push(codel);
+            c => {println!("An unrecognised colour was detected: {:?}", c); Codel::new(x, y, str_palette::WHITE)}
         }
-        canvas.push(row);
     }
-    Ok(canvas)
+
+    pub fn create_canvas(
+        img_path: &'static str, 
+        codel_size: u32
+    ) -> Result<Canvas, CanvasError> {
+        let image = image::open(img_path)?;
+
+        let (unsc_width, unsc_height) = image.dimensions();
+        if (!unsc_width.is_multiple_of(codel_size)) || (!unsc_height.is_multiple_of(codel_size)) {
+            return Err("Codel size mismatch!".into())
+        }
+        let (width, height) = (unsc_width/codel_size, unsc_height/codel_size);
+
+        let mut canvas: Canvas = Vec::new();
+        for i in 0..width {
+            let mut row: Vec<Codel> = Vec::new();
+            for j in 0..height {
+                let codel = codel_from_rgba_and_pos(
+                    image.get_pixel(i*codel_size, j*codel_size), 
+                    i as usize, 
+                    j as usize);
+                row.push(codel);
+            }
+            canvas.push(row);
+        }
+        Ok(canvas)
+    }
 }
