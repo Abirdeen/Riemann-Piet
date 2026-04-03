@@ -200,6 +200,34 @@ impl Interpreter {
             None => return false
         }
     }
+
+    fn step(&mut self, canvas: &mut Canvas) -> bool {
+        match canvas.get_codel(self.current_coordinate()) {
+            Codel::Black {..} => return false,
+            Codel::White {..} => return !self.try_move_through_white(canvas),
+            Codel::Colour(..) => {
+                for _ in 1..4 {
+                    if self.try_move_from_colour(canvas) {
+                        return true
+                    };
+                    self.flip_cc();
+                    if self.try_move_from_colour(canvas) {
+                        return true
+                    }
+                    self.rotate_dp_right(1);
+                }
+                return false
+            }
+
+        }
+    }
+
+    pub fn run(&mut self, canvas: &mut Canvas) {
+        let mut continue_program = true;
+        while continue_program {
+            continue_program = self.step(canvas);
+        }
+    }
 }
 
 mod commands {
