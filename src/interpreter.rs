@@ -154,6 +154,52 @@ impl Interpreter {
             }
         }
     }
+    fn get_exit_coords(&self, block: &mut CodelBlock) -> Coordinate {
+        match (self.dp(), self.cc()) {
+            (dp::NORTH, cc::LEFT) => block.northmost_west(),
+            (dp::NORTH, cc::RIGHT) => block.northmost_east(),
+            (dp::EAST, cc::LEFT) => block.eastmost_north(),
+            (dp::EAST, cc::RIGHT) => block.eastmost_south(),
+            (dp::SOUTH, cc::LEFT) => block.southmost_east(),
+            (dp::SOUTH, cc::RIGHT) => block.southmost_west(),
+            (dp::WEST, cc::LEFT) => block.westmost_south(),
+            (dp::WEST, cc::RIGHT) => block.westmost_north(),
+            _ => panic!()
+        }
+    }
+    fn next_coords(&self, canvas: &mut Canvas, coordinate: Coordinate) -> Option<Coordinate> {
+        match self.dp() {
+            dp::NORTH => {if !canvas.is_northmost(coordinate) {Some(canvas.north(coordinate))} else {None}},
+            dp::EAST => {if !canvas.is_eastmost(coordinate) {Some(canvas.east(coordinate))} else {None}},
+            dp::SOUTH => {if !canvas.is_southmost(coordinate) {Some(canvas.south(coordinate))} else {None}},
+            dp::WEST => {if !canvas.is_westmost(coordinate) {Some(canvas.west(coordinate))} else {None}},
+            _ => None
+        }
+    }
+    fn try_move_from_colour(&mut self, canvas: &mut Canvas) -> bool {
+        let result = canvas.get_block_from_coord(self.current_coordinate());
+        match result {
+            Some(block) => {
+                let from_coord = self.get_exit_coords(block);
+                let to_coord = match self.next_coords(canvas, from_coord) {
+                    Some(coord) => coord,
+                    // Will only be none if you're at the edge of a canvas; in future, this will try to move to a new canvas.
+                    None => return false
+                };
+                let next_codel = canvas.get_codel(to_coord);
+                if next_codel.is_black() {
+                    return false
+                }
+                match get_command(canvas, from_coord, to_coord) {
+                    Some(command) => self.execute_command(canvas, command),
+                    None => ()
+                };
+                self.update_coordinate(to_coord);
+                return true
+            },
+            None => return false
+        }
+    }
 }
 
 mod commands {
