@@ -34,6 +34,98 @@ pub struct Interpreter {
     cc: CodelChooser,
     current_coordinate: Coordinate
 }
+
+impl Interpreter {
+    pub fn new() -> Interpreter {
+        Interpreter {stack: Vec::new(), dp: dp::EAST, cc: cc::LEFT, current_coordinate: (0,0)}
+    }
+
+    fn stack(&mut self) -> &mut Stack {
+        &mut self.stack
+    }
+    fn dp(&self) -> DirectionalPointer {
+        self.dp
+    }
+    fn cc(&self) -> CodelChooser {
+        self.cc
+    }
+    fn current_coordinate(&self) -> Coordinate {
+        self.current_coordinate
+    }
+    fn update_coordinate(&mut self, new_coordinate: Coordinate) {
+        self.current_coordinate = new_coordinate
+    }
+
+    fn flip_cc(&mut self) {
+        match self.cc() {
+            cc::LEFT => self.cc = cc::RIGHT,
+            cc::RIGHT => self.cc = cc::LEFT,
+            _ => ()
+        }        
+    }
+    fn flip_n_cc(&mut self, n: i64) {
+        if n%2==0 {return ()}
+        self.flip_cc();
+    }
+    fn rotate_dp_right(&mut self, n: i64) {
+        if n%4==0 {
+            return ()
+        }
+        match self.dp() {
+            dp::NORTH => {self.dp = dp::EAST},
+            dp::EAST => {self.dp = dp::SOUTH},
+            dp::SOUTH => {self.dp = dp::WEST},
+            dp::WEST => {self.dp = dp::NORTH},
+            _ => ()
+        }
+        self.rotate_dp_right((n-1)%4);
+    }
+
+    fn execute_command(&mut self, canvas: &mut Canvas, command: Command) {
+        match command {
+            Command::Push(func) => {
+                let result = canvas.get_block_from_coord(self.current_coordinate());
+                match result {
+                    Some(block) => func(&mut self.stack(), block.size() as i64),
+                    None => ()
+                }
+            },
+            Command::StackOps(func) => {
+                func(&mut self.stack())
+            },
+            Command::Interpreter(func) => {
+                func(self)
+            },
+            Command::InputChar(func) => {
+                let mut buf = String::new();
+                std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
+                let char = buf.chars().nth(0).expect("No characters were read!");
+                func(&mut self.stack(), char)
+            },
+            Command::OutputChar(func) => {
+                let result = func(&mut self.stack());
+                match result {
+                    Some(character) => print!("{}", character),
+                    None => ()
+                }
+            },
+            Command::InputNum(func) => {
+                let mut buf = String::new();
+                std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
+                let input = buf.trim();
+                match input.parse::<i64>() {
+                    Ok(val) => func(&mut self.stack(), val),
+                    Err(_) => ()
+                }
+            },
+            Command::OutputNum(func) => {
+                let output = func(&mut self.stack());
+                print!("{}", output)
+            }
+        }
+    }
+}
+
 mod commands {
     use std::collections::VecDeque;
 
