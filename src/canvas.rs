@@ -1,11 +1,10 @@
 extern crate image;
+use crate::palette;
 
 use crate::str_palette;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Colour {
-    x: usize,
-    y: usize,
     hue: u8,
     light: u8,
     block_size: Option<i64>,
@@ -13,20 +12,13 @@ pub struct Colour {
 }
 
 impl Colour {
-    fn x(&self) -> usize {
-        self.x
-    }
-    fn y(&self) -> usize {
-        self.y
-    }
-    pub fn light(&self) -> u8 {
-        self.light
-    }
-    pub fn hue(&self) -> u8 {
+    fn hue(&self) -> u8 {
         self.hue
     }
-    pub fn block_size(&self) -> Option<i64> {
-        self.block_size
+    fn light(&self) -> u8 {
+        self.light
+    }
+    fn block_index(&self) -> Option<usize> {
     }
     fn name(&self) -> &'static str {
         self.name
@@ -40,71 +32,61 @@ impl Colour {
 #[derive(Debug, Clone, Copy)]
 pub enum Codel {
     Colour(Colour),
-    White {
-        x: usize,
-        y: usize,
-    },
-    Black {
-        x: usize,
-        y: usize,
-    }
+    White,
+    Black
 }
 
 impl Codel {  
-    pub fn new(x: usize, y: usize, colour_name: &str) -> Codel {
+    pub fn new(colour_name: &str) -> Codel {
         match colour_name {
-            str_palette::WHITE => Codel::White {x: x, y: y},
-            str_palette::BLACK => Codel::Black {x: x, y: y},
+            palette::text::WHITE => Codel::White,
+            palette::text::BLACK => Codel::Black,
 
-            str_palette::LR => Codel::Colour(Colour {x: x, y: y, hue: 0, light: 0, block_size: None, name: str_palette::LR}),
-            str_palette::R => Codel::Colour(Colour {x: x, y: y, hue: 0, light: 1, block_size: None, name: str_palette::R}),
-            str_palette::DR => Codel::Colour(Colour {x: x, y: y, hue: 0, light: 2, block_size: None, name: str_palette::DR}),
+            palette::text::LR => Codel::Colour(Colour {hue: 5, light: 0, block_index: None, name: palette::text::LR}),
+            palette::text::R => Codel::Colour(Colour {hue: 5, light: 1, block_index: None, name: palette::text::R}),
+            palette::text::DR => Codel::Colour(Colour {hue: 5, light: 2, block_index: None, name: palette::text::DR}),
 
-            str_palette::LY => Codel::Colour(Colour {x: x, y: y, hue: 1, light: 0, block_size: None, name: str_palette::LY}),
-            str_palette::Y => Codel::Colour(Colour {x: x, y: y, hue: 1, light: 1, block_size: None, name: str_palette::Y}),
-            str_palette::DY => Codel::Colour(Colour {x: x, y: y, hue: 1, light: 2, block_size: None, name: str_palette::DY}),
+            palette::text::LY => Codel::Colour(Colour {hue: 4, light: 0, block_index: None, name: palette::text::LY}),
+            palette::text::Y => Codel::Colour(Colour {hue: 4, light: 1, block_index: None, name: palette::text::Y}),
+            palette::text::DY => Codel::Colour(Colour {hue: 4, light: 2, block_index: None, name: palette::text::DY}),
 
-            str_palette::LG => Codel::Colour(Colour {x: x, y: y, hue: 2, light: 0, block_size: None, name: str_palette::LG}),
-            str_palette::G => Codel::Colour(Colour {x: x, y: y, hue: 2, light: 1, block_size: None, name: str_palette::G}),
-            str_palette::DG => Codel::Colour(Colour {x: x, y: y, hue: 2, light: 2, block_size: None, name: str_palette::DG}),
+            palette::text::LG => Codel::Colour(Colour {hue: 3, light: 0, block_index: None, name: palette::text::LG}),
+            palette::text::G => Codel::Colour(Colour {hue: 3, light: 1, block_index: None, name: palette::text::G}),
+            palette::text::DG => Codel::Colour(Colour {hue: 3, light: 2, block_index: None, name: palette::text::DG}),
 
-            str_palette::LC => Codel::Colour(Colour {x: x, y: y, hue: 3, light: 0, block_size: None, name: str_palette::LC}),
-            str_palette::C => Codel::Colour(Colour {x: x, y: y, hue: 3, light: 1, block_size: None, name: str_palette::C}),
-            str_palette::DC => Codel::Colour(Colour {x: x, y: y, hue: 3, light: 2, block_size: None, name: str_palette::DC}),
+            palette::text::LC => Codel::Colour(Colour {hue: 2, light: 0, block_index: None, name: palette::text::LC}),
+            palette::text::C => Codel::Colour(Colour {hue: 2, light: 1, block_index: None, name: palette::text::C}),
+            palette::text::DC => Codel::Colour(Colour {hue: 2, light: 2, block_index: None, name: palette::text::DC}),
 
-            str_palette::LB => Codel::Colour(Colour {x: x, y: y, hue: 4, light: 0, block_size: None, name: str_palette::LB}),
-            str_palette::B => Codel::Colour(Colour {x: x, y: y, hue: 4, light: 1, block_size: None, name: str_palette::B}),
-            str_palette::DB => Codel::Colour(Colour {x: x, y: y, hue: 4, light: 2, block_size: None, name: str_palette::DB}),
+            palette::text::LB => Codel::Colour(Colour {hue: 1, light: 0, block_index: None, name: palette::text::LB}),
+            palette::text::B => Codel::Colour(Colour {hue: 1, light: 1, block_index: None, name: palette::text::B}),
+            palette::text::DB => Codel::Colour(Colour {hue: 1, light: 2, block_index: None, name: palette::text::DB}),
 
-            str_palette::LM => Codel::Colour(Colour {x: x, y: y, hue: 5, light: 0, block_size: None, name: str_palette::LM}),
-            str_palette::M => Codel::Colour(Colour {x: x, y: y, hue: 5, light: 1, block_size: None, name: str_palette::M}),
-            str_palette::DM => Codel::Colour(Colour {x: x, y: y, hue: 5, light: 2, block_size: None, name: str_palette::DM}),
+            palette::text::LM => Codel::Colour(Colour {hue: 0, light: 0, block_index: None, name: palette::text::LM}),
+            palette::text::M => Codel::Colour(Colour {hue: 0, light: 1, block_index: None, name: palette::text::M}),
+            palette::text::DM => Codel::Colour(Colour {hue: 0, light: 2, block_index: None, name: palette::text::DM}),
 
             str => panic!("That's not an acceptable colour name: {}. Try again.", str)
         }
     }
 
-    pub fn x(&self) -> usize {
-        match self {
-            Codel::White {x, y:_} => *x,
-            Codel::Black {x, y:_} => *x,
-            Codel::Colour(colour) => colour.x()
-        }
-    }
-
-    pub fn y(&self) -> usize {
-        match self {
-            Codel::White {x:_, y} => *y,
-            Codel::Black { x:_, y } => *y,
-            Codel::Colour(colour) => colour.y()
-        }
-    }
-
     pub fn name(&self) -> &'static str {
         match self {
-            Codel::White {x:_, y:_} => str_palette::WHITE,
-            Codel::Black {x:_, y:_} => str_palette::BLACK,
+            Codel::White {..} => palette::text::WHITE,
+            Codel::Black {..} => palette::text::BLACK,
             Codel::Colour(colour) => colour.name()
+        }
+    }
+    pub fn hue(&self) -> Option<u8> {
+        match self {
+            Codel::Colour(colour) => Some(colour.hue()),
+            _ => None
+        }
+    }
+    pub fn light(&self) -> Option<u8> {
+        match self {
+            Codel::Colour(colour) => Some(colour.light()),
+            _ => None
         }
     }
 
@@ -135,8 +117,8 @@ impl Codel {
 
     pub fn is_colour(&self, colour_name: &str) -> bool {
         match self {
-            Codel::Black { x:_, y:_ } if colour_name == str_palette::BLACK => true,
-            Codel::White { x:_, y:_ } if colour_name == str_palette::WHITE => true,
+            Codel::Black {..} if colour_name == palette::text::BLACK => true,
+            Codel::White {..} if colour_name == palette::text::WHITE => true,
             Codel::Colour(colour) if colour_name == colour.name() => true,
             _ => false
         }
@@ -148,13 +130,12 @@ pub type CanvasError = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub type Canvas = Vec<Vec<Codel>>;
 
 mod canvas_utils {
-    use crate::{Codel, Canvas};
+    use crate::{Canvas, Codel};
     use crate::canvas::CanvasError;
-    use crate::rgba_palette;
-    use crate::str_palette;
+    use crate::palette;
     use image::{DynamicImage, GenericImageView};
 
-    mod block_size_utils {
+    mod block_utils {
         use crate::Canvas;
 
         fn fill(canvas: &mut Canvas, x: usize, y: usize, colour_name: &str, counted_block: i64) -> i64 {
@@ -208,36 +189,36 @@ mod canvas_utils {
 
     }
 
-    fn codel_from_rgba_and_pos(colour: image::Rgba<u8>, x: usize, y: usize) -> Codel {
+    fn codel_from_rgba_and_coord(colour: image::Rgba<u8>) -> Codel {
         match colour {
-            rgba_palette::BLACK => Codel::new(x, y, str_palette::BLACK),
-            rgba_palette::WHITE => Codel::new(x, y, str_palette::WHITE),
+            palette::rgba::BLACK => Codel::new(palette::text::BLACK),
+            palette::rgba::WHITE => Codel::new(palette::text::WHITE),
 
-            rgba_palette::LIGHT_RED => Codel::new(x, y, str_palette::LR),
-            rgba_palette::RED => Codel::new(x, y, str_palette::R),
-            rgba_palette::DARK_RED => Codel::new(x, y, str_palette::DR),
+            palette::rgba::LIGHT_RED => Codel::new(palette::text::LR),
+            palette::rgba::RED => Codel::new(palette::text::R),
+            palette::rgba::DARK_RED => Codel::new(palette::text::DR),
 
-            rgba_palette::LIGHT_YELLOW => Codel::new(x, y, str_palette::LY),
-            rgba_palette::YELLOW => Codel::new(x, y, str_palette::Y),
-            rgba_palette::DARK_YELLOW => Codel::new(x, y, str_palette::DY),
+            palette::rgba::LIGHT_YELLOW => Codel::new(palette::text::LY),
+            palette::rgba::YELLOW => Codel::new(palette::text::Y),
+            palette::rgba::DARK_YELLOW => Codel::new(palette::text::DY),
 
-            rgba_palette::LIGHT_GREEN => Codel::new(x, y, str_palette::LG),
-            rgba_palette::GREEN => Codel::new(x, y, str_palette::G),
-            rgba_palette::DARK_GREEN => Codel::new(x, y, str_palette::DG),
+            palette::rgba::LIGHT_GREEN => Codel::new(palette::text::LG),
+            palette::rgba::GREEN => Codel::new(palette::text::G),
+            palette::rgba::DARK_GREEN => Codel::new(palette::text::DG),
 
-            rgba_palette::LIGHT_CYAN => Codel::new(x, y, str_palette::LC),
-            rgba_palette::CYAN => Codel::new(x, y, str_palette::C),
-            rgba_palette::DARK_CYAN => Codel::new(x, y, str_palette::DC),
+            palette::rgba::LIGHT_CYAN => Codel::new(palette::text::LC),
+            palette::rgba::CYAN => Codel::new(palette::text::C),
+            palette::rgba::DARK_CYAN => Codel::new(palette::text::DC),
 
-            rgba_palette::LIGHT_BLUE => Codel::new(x, y, str_palette::LB),
-            rgba_palette::BLUE => Codel::new(x, y, str_palette::B),
-            rgba_palette::DARK_BLUE => Codel::new(x, y, str_palette::DB),
+            palette::rgba::LIGHT_BLUE => Codel::new(palette::text::LB),
+            palette::rgba::BLUE => Codel::new(palette::text::B),
+            palette::rgba::DARK_BLUE => Codel::new(palette::text::DB),
 
-            rgba_palette::LIGHT_MAGENTA => Codel::new(x, y, str_palette::LM),
-            rgba_palette::MAGENTA => Codel::new(x, y, str_palette::M),
-            rgba_palette::DARK_MAGENTA => Codel::new(x, y, str_palette::DM),
+            palette::rgba::LIGHT_MAGENTA => Codel::new(palette::text::LM),
+            palette::rgba::MAGENTA => Codel::new(palette::text::M),
+            palette::rgba::DARK_MAGENTA => Codel::new(palette::text::DM),
 
-            c => {println!("An unrecognised colour was detected: {:?}", c); Codel::new(x, y, str_palette::WHITE)}
+            c => {println!("An unrecognised colour was detected: {:?}. These colours are treated as white.", c); Codel::new(palette::text::WHITE)}
         }
     }
 
@@ -263,16 +244,16 @@ mod canvas_utils {
         for i in 0..width {
             let mut row: Vec<Codel> = Vec::new();
             for j in 0..height {
-                let codel = codel_from_rgba_and_pos(
-                    image.get_pixel(i*codel_size, j*codel_size), 
-                    i as usize, 
-                    j as usize);
+                let codel = codel_from_rgba_and_coord(
+                    image.get_pixel(i*codel_size, j*codel_size)
+                    );
                 row.push(codel);
             }
             canvas.push(row);
         }
 
         block_size_utils::set_block_sizes(&mut canvas);
+
 
         Ok(canvas)
     }
