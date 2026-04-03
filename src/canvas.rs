@@ -253,7 +253,7 @@ mod canvas_utils {
     }
 
     pub fn create_canvas(
-        img_path: &'static str, 
+        img_path: &str, 
         codel_size: u32
     ) -> Result<Canvas, CanvasError> {
         let image = image::open(img_path)?;
@@ -279,7 +279,7 @@ mod canvas_utils {
 }
 
 pub fn create_canvas(
-        img_path: &'static str, 
+        img_path: &str, 
         codel_size: u32
     ) -> Result<Canvas, CanvasError> {
     canvas_utils::create_canvas(img_path, codel_size)
