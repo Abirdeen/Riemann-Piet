@@ -122,6 +122,18 @@ impl Codel {
             _ => false
         }
     }
+    pub fn is_any_colour(&self) -> bool {
+        match self {
+            Codel::Colour(_) => true,
+            _ => false
+        }
+    }
+    pub fn is_black(&self) -> bool {
+        match self {
+            Codel::Black {..} => true,
+            _ => false
+        }
+    }
 #[derive(Debug, Clone)]
 pub struct CodelBlock {
     index: usize,
