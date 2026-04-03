@@ -124,6 +124,36 @@ impl Interpreter {
             }
         }
     }
+
+    fn try_step_from_white(&self, canvas: &mut Canvas) -> Option<(Coordinate, bool)> {
+        match self.next_coords(canvas, self.current_coordinate()) {
+            Some(next_coord) => {
+                match canvas.get_codel(next_coord) {
+                    Codel::White {..} => Some((next_coord, false)),
+                    Codel::Colour(_) => {return Some((next_coord, true))},
+                    Codel::Black {..} => None
+                }
+            },
+            None => return None
+        }        
+    }
+
+    fn try_move_through_white(&mut self, canvas: &mut Canvas) -> bool {
+        let mut current_coord = self.current_coordinate();
+        let mut visited: Vec<Coordinate> = Vec::new();
+        loop {
+            if visited.contains(&current_coord) {
+                return false
+            }
+            visited.push(current_coord);
+
+            match self.try_step_from_white(canvas) {
+                Some((coordinate, true)) => self.update_coordinate(coordinate),
+                Some((coordinate, false)) => current_coord = coordinate,
+                None => {self.flip_cc(); self.rotate_dp_right(1);}
+            }
+        }
+    }
 }
 
 mod commands {
