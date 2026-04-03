@@ -134,6 +134,23 @@ impl Codel {
             _ => false
         }
     }
+
+    pub fn hue_difference(&self, codel: Codel) -> Option<u8> {
+        match (self.hue(), codel.hue()) {
+            (Some(hue1), Some(hue2)) => {
+                Some((hue1 as i16 - hue2 as i16).rem_euclid(6) as u8)},
+            _ => None
+        }
+    }
+    pub fn light_difference(&self, codel: Codel) -> Option<u8> {
+        match (self.light(), codel.light()) {
+            (Some(light1), Some(light2)) => Some((light2 as i16 - light1 as i16).rem_euclid(3) as u8),
+            _ => None
+        }
+    }
+
+}
+
 #[derive(Debug, Clone)]
 pub struct CodelBlock {
     index: usize,
