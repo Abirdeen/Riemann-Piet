@@ -131,12 +131,12 @@ impl Interpreter {
         }
     }
 
-    fn try_step_from_white(&self, canvas: &mut Canvas) -> Option<(Coordinate, bool)> {
-        match self.next_coords(canvas, self.current_coordinate()) {
+    fn try_step_from_white(&self, canvas: &mut Canvas, current_coordinate: Coordinate) -> Option<(Coordinate, bool)> {
+        match self.next_coords(canvas, current_coordinate) {
             Some(next_coord) => {
                 match canvas.get_codel(next_coord) {
                     Codel::White {..} => Some((next_coord, false)),
-                    Codel::Colour(_) => {return Some((next_coord, true))},
+                    Codel::Colour(_) => Some((next_coord, true)),
                     Codel::Black {..} => None
                 }
             },
@@ -153,11 +153,14 @@ impl Interpreter {
             }
             visited.push(current_coord);
 
-            match self.try_step_from_white(canvas) {
-                Some((coordinate, true)) => self.update_coordinate(coordinate),
+            match self.try_step_from_white(canvas, current_coord) {
+                Some((coordinate, true)) => {
+                    self.update_coordinate(coordinate);
+                    return true
+                },
                 Some((coordinate, false)) => current_coord = coordinate,
                 None => {self.flip_cc(); self.rotate_dp_right(1);}
-            }
+            };
         }
     }
     fn get_exit_coords(&self, block: &mut CodelBlock) -> Coordinate {

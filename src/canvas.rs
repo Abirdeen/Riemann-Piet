@@ -25,7 +25,7 @@ impl Colour {
     fn block_index(&self) -> Option<usize> {
         self.block_index
     }
-    fn name(&self) -> &'static str {
+    pub fn name(&self) -> &'static str {
         self.name
     }
     fn set_block_index(&mut self, new_index: usize) {
