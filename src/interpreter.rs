@@ -243,11 +243,14 @@ impl Interpreter {
         }
     }
 
-    pub fn run(&mut self, canvas: &mut Canvas) {
+    pub fn run(&mut self, canvas: &mut Canvas, max_heartbeats: i64) {
         let mut continue_program = true;
-        while continue_program {
+        let mut heartbeats = 0_i64;
+        while continue_program && heartbeats < max_heartbeats {
             continue_program = self.step(canvas);
+            heartbeats += 1;
         }
+        log::info!("Program terminated after {heartbeats} steps")
     }
 }
 
