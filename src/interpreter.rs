@@ -151,14 +151,16 @@ impl Interpreter {
             if visited.contains(&current_coord) {
                 return false
             }
-            visited.push(current_coord);
 
             match self.try_step_from_white(canvas, current_coord) {
                 Some((coordinate, true)) => {
                     self.update_coordinate(coordinate);
                     return true
                 },
-                Some((coordinate, false)) => current_coord = coordinate,
+                Some((coordinate, false)) => {
+                    visited.push(current_coord);
+                    current_coord = coordinate
+                },
                 None => {self.flip_cc(); self.rotate_dp_right(1);}
             };
         }
@@ -192,7 +194,6 @@ impl Interpreter {
                 let from_coord = self.get_exit_coords(block);
                 let to_coord = match self.next_coords(canvas, from_coord) {
                     Some(coord) => {
-                        log::debug!("Exit coordinate is {coord:?}");
                         coord
                     },
                     // Will only be none if you're at the edge of a canvas; in future, this will try to move to a new canvas.
@@ -202,6 +203,7 @@ impl Interpreter {
                 if next_codel.is_black() {
                     return false
                 }
+                log::debug!("Exit coordinate is {to_coord:?}");
                 match get_command(canvas, from_coord, to_coord) {
                     Some(command) => self.execute_command(canvas, command),
                     None => ()
@@ -227,16 +229,17 @@ impl Interpreter {
                 let colour_name = colour.name();
                 log::debug!("Interpreter stepping from a {colour_name} block");
                 log::debug!("Codel chooser points {}, direction pointer points {}", self.cc(), self.dp());
-                for _ in 1..4 {
+                for _ in 1..=4 {
                     if self.try_move_from_colour(canvas) {
                         return true
                     };
                     self.flip_cc();
+                    log::debug!("Codel chooser flipped {}", self.cc());
                     if self.try_move_from_colour(canvas) {
                         return true
                     }
                     self.rotate_dp_right(1);
-                    log::debug!("Codel chooser points {}, direction pointer points {}", self.cc(), self.dp());
+                    log::debug!("Direction pointer rotated {}", self.dp());
                 }
                 return false
             }
