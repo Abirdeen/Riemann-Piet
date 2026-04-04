@@ -484,5 +484,14 @@ pub fn create_canvas(
         img_path: &str, 
         codel_size: u32
     ) -> Result<Canvas, CanvasError> {
-    canvas_utils::create_canvas(img_path, codel_size)
+    match canvas_utils::create_canvas(img_path, codel_size) {
+        Ok(canvas) => {
+            log::info!("Successfully painted canvas");
+            return Ok(canvas)
+        },
+        Err(e) => {
+            log::error!("Encountered an error painting canvas: {e}");
+            return Err(e)
+        }
+    }
 }
