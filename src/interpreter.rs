@@ -68,7 +68,7 @@ impl Interpreter {
         self.flip_cc();
     }
     fn rotate_dp_right(&mut self, n: i64) {
-        if n%4==0 {
+        if n.rem_euclid(4)==0 {
             return ()
         }
         match self.dp() {
@@ -78,7 +78,7 @@ impl Interpreter {
             dp::WEST => {self.dp = dp::NORTH},
             _ => ()
         }
-        self.rotate_dp_right((n-1)%4);
+        self.rotate_dp_right((n-1).rem_euclid(4));
     }
 
     fn execute_command(&mut self, canvas: &mut Canvas, command: Command) {
