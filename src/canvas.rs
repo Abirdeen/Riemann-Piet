@@ -438,7 +438,7 @@ mod canvas_utils {
             palette::rgba::MAGENTA => Codel::new(palette::text::M),
             palette::rgba::DARK_MAGENTA => Codel::new(palette::text::DM),
 
-            c => {println!("An unrecognised colour was detected: {:?}. These colours are treated as white.", c); Codel::new(palette::text::WHITE)}
+            c => {log::warn!("An unrecognised colour was detected: {:?}. These colours are treated as black.", c); Codel::new(palette::text::BLACK)}
         }
     }
 
