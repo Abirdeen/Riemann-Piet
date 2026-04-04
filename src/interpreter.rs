@@ -1,4 +1,4 @@
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 
 use crate::canvas::{Coordinate, Codel, CodelBlock, Canvas};
 
@@ -97,6 +97,9 @@ impl Interpreter {
                 func(self)
             },
             Command::InputChar(func) => {
+                print!("Input char: ");
+                std::io::stdout().flush().expect("Failed to flush");
+
                 let mut buf = String::new();
                 std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
                 let char = buf.chars().nth(0).expect("No characters were read!");
@@ -110,6 +113,8 @@ impl Interpreter {
                 }
             },
             Command::InputNum(func) => {
+                print!("Input num: ");
+                std::io::stdout().flush().expect("Failed to flush");
                 let mut buf = String::new();
                 std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
                 let input = buf.trim();
