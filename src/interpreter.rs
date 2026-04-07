@@ -180,10 +180,10 @@ impl Interpreter {
     }
     fn next_coords(&self, canvas: &mut Canvas, coordinate: Coordinate) -> Option<Coordinate> {
         match self.dp() {
-            dp::NORTH => {if !canvas.is_northmost(coordinate) {Some(canvas.north(coordinate))} else {None}},
-            dp::EAST => {if !canvas.is_eastmost(coordinate) {Some(canvas.east(coordinate))} else {None}},
-            dp::SOUTH => {if !canvas.is_southmost(coordinate) {Some(canvas.south(coordinate))} else {None}},
-            dp::WEST => {if !canvas.is_westmost(coordinate) {Some(canvas.west(coordinate))} else {None}},
+            dp::NORTH => canvas.north(coordinate),
+            dp::EAST => canvas.east(coordinate),
+            dp::SOUTH => canvas.south(coordinate),
+            dp::WEST => canvas.west(coordinate),
             _ => None
         }
     }

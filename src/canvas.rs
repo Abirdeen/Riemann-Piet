@@ -311,17 +311,29 @@ impl Canvas {
         return Some(&mut self.blocks[index])
     }
 
-    pub fn north(&self, (x,y): Coordinate) -> Coordinate {
-        return (x, y-1)
+    pub fn north(&self, (x,y): Coordinate) -> Option<Coordinate> {
+        if self.is_northmost((x,y)) {
+            return None
+        }
+        return Some((x, y-1))
     }
-    pub fn east(&self, (x,y): Coordinate) -> Coordinate {
-        return (x+1, y)
+    pub fn east(&self, (x,y): Coordinate) -> Option<Coordinate> {
+        if self.is_eastmost((x,y)) {
+            return None
+        }
+        return Some((x+1, y))
     }
-    pub fn south(&self, (x,y): Coordinate) -> Coordinate {
-        return (x, y+1)
+    pub fn south(&self, (x,y): Coordinate) -> Option<Coordinate> {
+        if self.is_southmost((x,y)) {
+            return None
+        }
+        return Some((x, y+1))
     }
-    pub fn west(&self, (x,y): Coordinate) -> Coordinate {
-        return (x-1, y)
+    pub fn west(&self, (x,y): Coordinate) -> Option<Coordinate> {
+        if self.is_westmost((x,y)) {
+            return None
+        }
+        return Some((x-1, y))
     }
 
     pub fn is_northmost(&self, (_,y): Coordinate) -> bool {
