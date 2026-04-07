@@ -14,8 +14,8 @@ pub enum Command<'a> {
 }
 
 type Stack = Vec<i64>;
-type DirectionalPointer = &'static str;
-type CodelChooser = &'static str;
+pub type DirectionalPointer = &'static str;
+pub type CodelChooser = &'static str;
 
 mod dp {
     pub const NORTH: &'static str = "North";

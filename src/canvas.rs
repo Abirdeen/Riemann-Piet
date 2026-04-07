@@ -75,7 +75,7 @@ impl Codel {
         }
     }
 
-    pub fn name(&self) -> &'static str {
+    pub fn colour_name(&self) -> &'static str {
         match self {
             Codel::White {..} => palette::text::WHITE,
             Codel::Black {..} => palette::text::BLACK,
@@ -302,10 +302,18 @@ impl Canvas {
         self.codel_iter.clone()
     }
 
+    pub fn blocks_list(&self) -> &Vec<CodelBlock> {
+        &self.blocks
+    }
+
     pub fn get_codel(&mut self, coordinate: Coordinate) -> &mut Codel {
         let (x, y) = coordinate;
         &mut self.codel_map[x][y]
     }
+    pub fn is_colour(&mut self, coordinate: Coordinate, colour: &str) -> bool {
+        self.get_codel(coordinate).is_colour(colour)
+    }
+
     pub fn get_block_from_coord(&mut self, coordinate: Coordinate) -> Option<&mut CodelBlock> {
         let index = self.get_codel(coordinate).block_index()?;
         return Some(&mut self.blocks[index])
