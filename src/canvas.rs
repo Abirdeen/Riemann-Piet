@@ -356,9 +356,166 @@ impl Canvas {
     pub fn is_westmost(&self, (x,_): Coordinate) -> bool {
         return x==0
     }
+    fn is_west_of((west_x,_): Coordinate, (east_x,_): Coordinate) -> bool {
+        return west_x <= east_x
+    }
 
     pub fn add_block(&mut self, block: CodelBlock) {
         self.blocks.push(block);
+    }
+
+    fn add_coord_to_block(&mut self, block: &mut CodelBlock, coordinate: Coordinate) {
+        if !self.get_codel(coordinate).no_index() {return}
+        block.add_coordinate(coordinate);
+        self.get_codel(coordinate).set_block_index(block.index());
+    }
+
+    fn find_colour_west_edge(
+        &mut self, 
+        block: &mut CodelBlock, 
+        coordinate: Coordinate, 
+        colour: &str
+    ) -> (Option<Coordinate>, bool) {
+        if !self.is_colour(coordinate, colour) {
+            return (None, false)
+        }
+        self.add_coord_to_block(block, coordinate);
+        let mut west_coord = coordinate;
+        let mut pushed_west = false;
+
+        while !self.is_westmost(west_coord) {
+            match self.west(west_coord) {
+                Some(coord) => {
+                    west_coord = coord;
+                    if !self.is_colour(west_coord, colour) {
+                        return (Some(self.east(west_coord).expect("go west then east => fine?")), pushed_west)
+                    }                    
+                    pushed_west = true;
+                    self.add_coord_to_block(block, west_coord);
+                },
+                None => {}
+            }
+        }
+        return (Some(west_coord), pushed_west)
+    }
+    fn find_colour_east_edge(
+        &mut self, 
+        block: &mut CodelBlock, 
+        coordinate: Coordinate, 
+        colour: &str
+    ) -> Option<Coordinate> {
+        if !self.is_colour(coordinate, colour) {
+            return None
+        }
+        self.add_coord_to_block(block, coordinate);
+        let mut east_coord = coordinate;
+
+        while !self.is_eastmost(east_coord) {
+            match self.east(east_coord) {
+                Some(coord) => {
+                    east_coord = coord;
+                    if !self.is_colour(east_coord, colour) {
+                        return Some(self.west(east_coord).expect("go west then east => fine?"))
+                    }
+                    self.add_coord_to_block(block, east_coord);
+                },
+                None => {}
+            }
+
+        }
+        return Some(east_coord)
+    }
+    fn find_disjoint_intervals_east(
+        &mut self,
+        block: &mut CodelBlock,
+        colour: &str,
+        east_boundary: Coordinate,
+        west_seed: Coordinate
+    ) -> (Vec<(Coordinate, Coordinate)>, bool) {
+        let mut went_east_of_boundary = false;
+        let mut intervals: Vec<(Coordinate, Coordinate)> = Vec::new();
+        let mut west_edge = west_seed;
+        while Self::is_west_of(west_edge, east_boundary) {
+            match self.find_colour_east_edge(block, west_edge, colour) {
+                Some(east_edge) => {
+                    went_east_of_boundary = !Self::is_west_of(east_edge, east_boundary);
+                    intervals.push((west_edge, east_edge));
+                    match self.east(east_edge) {
+                        Some(coord) => west_edge = coord,
+                        None => return (intervals, went_east_of_boundary)
+                    };
+                },
+                None => {
+                    if west_edge == east_boundary {
+                        return (intervals, went_east_of_boundary)
+                    }
+                    match self.east(west_edge) {
+                        Some(coord) => west_edge = coord,
+                        None => return (intervals, went_east_of_boundary)
+                    }
+                }
+            };
+        };
+        return (intervals, went_east_of_boundary)
+    }
+
+    fn build_block(&mut self, block: &mut CodelBlock, seed: Coordinate) {
+        let codel = self.get_codel(seed);
+        if !codel.is_any_colour() {return};
+        let colour = codel.colour_name();
+        let mut stack: Vec<(usize, usize, usize, i8)> = Vec::new();
+        let (x,y) = seed;
+
+        stack.push((y,x,x,1));
+        if !self.is_southmost(seed) {stack.push((y+1,x,x,-1));};
+        while stack.len() > 0 {
+            let (y, xl, xr, dy) = stack.pop().unwrap();
+            let (yb, yf) = ((y as i64 + dy as i64) as usize, (y as i64 - dy as i64) as usize);
+            if self.get_codel((xl,y)).block_index() == Some(block.index()) {
+                continue;
+            }
+            let mut west_edge = xl;
+            match self.find_colour_west_edge(block, (west_edge,y), colour) {
+                (Some((new_west, _)), true) => {
+                    west_edge = new_west;
+                    if (dy == 1 && !self.is_southmost((xl,y))) || (dy==-1 && !self.is_northmost((xl,y))) {
+                        stack.push((yb, west_edge, xl-1, -dy));
+                    }
+                },
+                _ => {}
+            };
+            let (intervals, pushed_right) = self.find_disjoint_intervals_east(block, colour, (xr,y), (west_edge, y));
+
+            match (pushed_right, intervals.last()) {
+                (true, Some(&(_, (new_east, _)))) => {
+                    match self.east((xr,y)) {
+                        Some((new_west,_)) => {
+                            if (dy == 1 && !self.is_southmost((xl,y))) || (dy==-1 && !self.is_northmost((xl,y))) {
+                                stack.push((yb, new_west, new_east, -dy));
+                            }
+                        }
+                        None => {}
+                    }
+                },
+                _ => {}
+            }
+            if (dy == 1 && !self.is_northmost((xl,y))) || (dy==-1 && !self.is_southmost((xl,y))) {
+                let new_spans = &mut intervals.iter().map(|((xw,_),(xe,_))| (yf,*xw,*xe,dy)).collect_vec();
+                stack.append(new_spans);
+            }
+        }                
+    }
+    pub fn create_blocks(&mut self) {
+        let mut index = 0;
+        for coordinate in self.coordinates_iter().clone() {
+            if self.get_codel(coordinate).no_index() {
+                let mut block = CodelBlock::new(index, coordinate);
+                self.build_block(&mut block, coordinate);
+                self.add_block(block);
+                index += 1;
+
+            }
+        }
     }
 }
 
@@ -367,67 +524,6 @@ mod canvas_utils {
     use crate::canvas::CanvasError;
     use crate::palette;
     use image::{DynamicImage, GenericImageView};
-
-    mod block_utils {
-        use crate::Canvas;
-        use crate::canvas::{CodelBlock, Coordinate};
-
-        fn try_cardinal_fills(
-            canvas: &mut Canvas, 
-            coordinate: Coordinate, 
-            colour_name: &str, 
-            block: &mut CodelBlock
-        ) {
-            if !canvas.is_northmost(coordinate) {
-                build_block(canvas, canvas.north(coordinate), colour_name, block);
-            };
-            if !canvas.is_eastmost(coordinate) {
-                build_block(canvas, canvas.east(coordinate), colour_name, block);
-            };
-            if !canvas.is_southmost(coordinate) {
-                build_block(canvas, canvas.south(coordinate), colour_name, block);
-            };
-            if !canvas.is_westmost(coordinate) {
-                build_block(canvas, canvas.west(coordinate), colour_name, block);
-            };
-        }
-
-        fn build_block(
-            canvas: &mut Canvas, 
-            coordinate: Coordinate, 
-            colour_name: &str, 
-            block: &mut CodelBlock
-        ) {
-            let codel = canvas.get_codel(coordinate);
-            if !codel.no_index() {
-                return ()
-            }
-            if !codel.is_colour(colour_name) {
-                return ()
-            }
-
-            block.add_coordinate(coordinate);
-            codel.set_block_index(block.index());
-
-            try_cardinal_fills(canvas, coordinate, colour_name, block)
-        }
-
-        // This algorithm is horribly unoptimised; a better version is Paul Heckbert's span fill. Not a huge worry, as this is a compile-time problem.
-        // Note: this also doesn't cover blocks that span canvases! Implicitly imagines a thin white frame around each canvas.
-        pub fn set_block_sizes(canvas: &mut Canvas) {
-            let mut index = 0;
-            for coordinate in canvas.coordinates_iter() {
-                if canvas.get_codel(coordinate).no_index() {
-                    let mut block = CodelBlock::new(index, coordinate);
-                    let colour_name = canvas.get_codel(coordinate).name();
-                    build_block(canvas, coordinate, colour_name, &mut block);
-                    canvas.add_block(block);
-                    index += 1;
-                }
-            }
-        }
-
-    }
 
     fn codel_from_rgba_and_coord(colour: image::Rgba<u8>) -> Codel {
         match colour {
@@ -493,8 +589,7 @@ mod canvas_utils {
         }
 
         let mut canvas = *Canvas::new(codel_map);
-
-        block_utils::set_block_sizes(&mut canvas);
+        canvas.create_blocks();
 
         Ok(canvas)
     }
