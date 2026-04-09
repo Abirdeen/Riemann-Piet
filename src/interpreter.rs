@@ -14,19 +14,19 @@ pub enum Command<'a> {
 }
 
 type Stack = Vec<i64>;
-pub type DirectionalPointer = &'static str;
-pub type CodelChooser = &'static str;
 
-mod dp {
-    pub const NORTH: &'static str = "North";
-    pub const EAST: &'static str = "East";
-    pub const WEST: &'static str = "West";
-    pub const SOUTH: &'static str = "South";
+#[derive(Debug, Clone, Copy)]
+pub enum DirectionalPointer {
+    North,
+    East,
+    South,
+    West
 }
 
-mod cc {
-    pub const LEFT: &'static str = "Left";
-    pub const RIGHT: &'static str = "Right";
+#[derive(Debug, Clone, Copy)]
+pub enum CodelChooser {
+    Left,
+    Right
 }
 
 pub struct Interpreter {
@@ -38,7 +38,7 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter {stack: Vec::new(), dp: dp::EAST, cc: cc::LEFT, current_coordinate: (0,0)}
+        Interpreter {stack: Vec::new(), dp: DirectionalPointer::East, cc: CodelChooser::Left, current_coordinate: (0,0)}
     }
 
     fn stack(&mut self) -> &mut Stack {
@@ -59,8 +59,8 @@ impl Interpreter {
 
     fn flip_cc(&mut self) {
         match self.cc() {
-            cc::LEFT => self.cc = cc::RIGHT,
-            cc::RIGHT => self.cc = cc::LEFT,
+            CodelChooser::Left => self.cc = CodelChooser::Right,
+            CodelChooser::Right => self.cc = CodelChooser::Left,
             _ => ()
         }        
     }
@@ -73,10 +73,10 @@ impl Interpreter {
             return ()
         }
         match self.dp() {
-            dp::NORTH => {self.dp = dp::EAST},
-            dp::EAST => {self.dp = dp::SOUTH},
-            dp::SOUTH => {self.dp = dp::WEST},
-            dp::WEST => {self.dp = dp::NORTH},
+            DirectionalPointer::North => {self.dp = DirectionalPointer::East},
+            DirectionalPointer::East => {self.dp = DirectionalPointer::South},
+            DirectionalPointer::South => {self.dp = DirectionalPointer::West},
+            DirectionalPointer::West => {self.dp = DirectionalPointer::North},
             _ => ()
         }
         self.rotate_dp_right((n-1).rem_euclid(4));
@@ -167,23 +167,23 @@ impl Interpreter {
     }
     fn get_exit_coords(&self, block: &mut CodelBlock) -> Coordinate {
         match (self.dp(), self.cc()) {
-            (dp::NORTH, cc::LEFT) => block.northmost_west(),
-            (dp::NORTH, cc::RIGHT) => block.northmost_east(),
-            (dp::EAST, cc::LEFT) => block.eastmost_north(),
-            (dp::EAST, cc::RIGHT) => block.eastmost_south(),
-            (dp::SOUTH, cc::LEFT) => block.southmost_east(),
-            (dp::SOUTH, cc::RIGHT) => block.southmost_west(),
-            (dp::WEST, cc::LEFT) => block.westmost_south(),
-            (dp::WEST, cc::RIGHT) => block.westmost_north(),
+            (DirectionalPointer::North, CodelChooser::Left) => block.northmost_west(),
+            (DirectionalPointer::North, CodelChooser::Right) => block.northmost_east(),
+            (DirectionalPointer::East, CodelChooser::Left) => block.eastmost_north(),
+            (DirectionalPointer::East, CodelChooser::Right) => block.eastmost_south(),
+            (DirectionalPointer::South, CodelChooser::Left) => block.southmost_east(),
+            (DirectionalPointer::South, CodelChooser::Right) => block.southmost_west(),
+            (DirectionalPointer::West, CodelChooser::Left) => block.westmost_south(),
+            (DirectionalPointer::West, CodelChooser::Right) => block.westmost_north(),
             _ => panic!()
         }
     }
     fn next_coords(&self, canvas: &mut Canvas, coordinate: Coordinate) -> Option<Coordinate> {
         match self.dp() {
-            dp::NORTH => canvas.north(coordinate),
-            dp::EAST => canvas.east(coordinate),
-            dp::SOUTH => canvas.south(coordinate),
-            dp::WEST => canvas.west(coordinate),
+            DirectionalPointer::North => canvas.north(coordinate),
+            DirectionalPointer::East => canvas.east(coordinate),
+            DirectionalPointer::South => canvas.south(coordinate),
+            DirectionalPointer::West => canvas.west(coordinate),
             _ => None
         }
     }
@@ -222,24 +222,24 @@ impl Interpreter {
                 return false
             },
             Codel::White {..} => {
-                log::debug!("Interpreter stepping from a white block");
+                log::debug!("Interpreter stepping from a White block");
                 return self.try_move_through_white(canvas)
             },
             Codel::Colour(colour) => {
                 let colour_name = colour.name();
                 log::debug!("Interpreter stepping from a {colour_name} block");
-                log::debug!("Codel chooser points {}, direction pointer points {}", self.cc(), self.dp());
+                log::debug!("Codel chooser points {:?}, direction pointer points {:?}", self.cc(), self.dp());
                 for _ in 1..=4 {
                     if self.try_move_from_colour(canvas) {
                         return true
                     };
                     self.flip_cc();
-                    log::debug!("Codel chooser flipped {}", self.cc());
+                    log::debug!("Codel chooser flipped {:?}", self.cc());
                     if self.try_move_from_colour(canvas) {
                         return true
                     }
                     self.rotate_dp_right(1);
-                    log::debug!("Direction pointer rotated {}", self.dp());
+                    log::debug!("Direction pointer rotated {:?}", self.dp());
                 }
                 return false
             }
@@ -346,21 +346,17 @@ mod commands {
             log::debug!("Rolled zero values");
             return ()
         }
-
         log::debug!("Rolled {y} values by {x}");
-
         let mut vals: VecDeque<i64> = VecDeque::new();
         for _i in 0..y {
             // Justify: by construction of y, we should never pop more than the full stack
             vals.push_back(stack.pop().unwrap());
         }
-
         if x<0 {
             vals.rotate_left(x.abs().rem_euclid(vals.len() as i64) as usize);
         } else if x>0 {
             vals.rotate_right(x.rem_euclid(vals.len() as i64) as usize);
         }
-
         for _i in 0..vals.len() {
             stack.push(vals.pop_back().unwrap_or(0));
         }
