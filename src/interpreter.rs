@@ -16,7 +16,7 @@ pub enum Command<'a> {
 type Stack = Vec<i64>;
 
 #[derive(Debug, Clone, Copy)]
-pub enum DirectionalPointer {
+pub enum DP {
     North,
     East,
     South,
@@ -24,30 +24,31 @@ pub enum DirectionalPointer {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum CodelChooser {
+pub enum CC {
     Left,
     Right
 }
 
 pub struct Interpreter {
     stack: Stack,
-    dp: DirectionalPointer,
-    cc: CodelChooser,
+    dp: DP,
+    cc: CC,
     current_coordinate: Coordinate
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter {stack: Vec::new(), dp: DirectionalPointer::East, cc: CodelChooser::Left, current_coordinate: (0,0)}
+        Interpreter {stack: Vec::new(), dp: DP::East, cc: CC::Left, current_coordinate: (0,0)}
+    }
     }
 
     fn stack(&mut self) -> &mut Stack {
         &mut self.stack
     }
-    fn dp(&self) -> DirectionalPointer {
+    fn dp(&self) -> DP {
         self.dp
     }
-    fn cc(&self) -> CodelChooser {
+    fn cc(&self) -> CC {
         self.cc
     }
     fn current_coordinate(&self) -> Coordinate {
@@ -59,9 +60,8 @@ impl Interpreter {
 
     fn flip_cc(&mut self) {
         match self.cc() {
-            CodelChooser::Left => self.cc = CodelChooser::Right,
-            CodelChooser::Right => self.cc = CodelChooser::Left,
-            _ => ()
+            CC::Left => self.cc = CC::Right,
+            CC::Right => self.cc = CC::Left
         }        
     }
     fn flip_n_cc(&mut self, n: i64) {
@@ -73,11 +73,10 @@ impl Interpreter {
             return ()
         }
         match self.dp() {
-            DirectionalPointer::North => {self.dp = DirectionalPointer::East},
-            DirectionalPointer::East => {self.dp = DirectionalPointer::South},
-            DirectionalPointer::South => {self.dp = DirectionalPointer::West},
-            DirectionalPointer::West => {self.dp = DirectionalPointer::North},
-            _ => ()
+            DP::North => {self.dp = DP::East},
+            DP::East => {self.dp = DP::South},
+            DP::South => {self.dp = DP::West},
+            DP::West => {self.dp = DP::North}
         }
         self.rotate_dp_right((n-1).rem_euclid(4));
     }
@@ -167,24 +166,22 @@ impl Interpreter {
     }
     fn get_exit_coords(&self, block: &mut CodelBlock) -> Coordinate {
         match (self.dp(), self.cc()) {
-            (DirectionalPointer::North, CodelChooser::Left) => block.northmost_west(),
-            (DirectionalPointer::North, CodelChooser::Right) => block.northmost_east(),
-            (DirectionalPointer::East, CodelChooser::Left) => block.eastmost_north(),
-            (DirectionalPointer::East, CodelChooser::Right) => block.eastmost_south(),
-            (DirectionalPointer::South, CodelChooser::Left) => block.southmost_east(),
-            (DirectionalPointer::South, CodelChooser::Right) => block.southmost_west(),
-            (DirectionalPointer::West, CodelChooser::Left) => block.westmost_south(),
-            (DirectionalPointer::West, CodelChooser::Right) => block.westmost_north(),
-            _ => panic!()
+            (DP::North, CC::Left) => block.northmost_west(),
+            (DP::North, CC::Right) => block.northmost_east(),
+            (DP::East, CC::Left) => block.eastmost_north(),
+            (DP::East, CC::Right) => block.eastmost_south(),
+            (DP::South, CC::Left) => block.southmost_east(),
+            (DP::South, CC::Right) => block.southmost_west(),
+            (DP::West, CC::Left) => block.westmost_south(),
+            (DP::West, CC::Right) => block.westmost_north()
         }
     }
     fn next_coords(&self, canvas: &mut Canvas, coordinate: Coordinate) -> Option<Coordinate> {
         match self.dp() {
-            DirectionalPointer::North => canvas.north(coordinate),
-            DirectionalPointer::East => canvas.east(coordinate),
-            DirectionalPointer::South => canvas.south(coordinate),
-            DirectionalPointer::West => canvas.west(coordinate),
-            _ => None
+            DP::North => canvas.north(coordinate),
+            DP::East => canvas.east(coordinate),
+            DP::South => canvas.south(coordinate),
+            DP::West => canvas.west(coordinate)
         }
     }
     fn try_move_from_colour(&mut self, canvas: &mut Canvas) -> bool {

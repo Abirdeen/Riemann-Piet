@@ -508,7 +508,7 @@ impl Canvas {
         }
         return Some(east_coord)
     }
-    fn find_disjoint_intervals_east(
+    fn find_disjoint_intervals(
         &mut self,
         block: &mut CodelBlock,
         colour: &str,
@@ -567,9 +567,9 @@ impl Canvas {
                 },
                 _ => {}
             };
-            let (intervals, pushed_right) = self.find_disjoint_intervals_east(block, colour, (xr,y), (west_edge, y));
+            let (intervals, pushed_east) = self.find_disjoint_intervals(block, colour, (xr,y), (west_edge, y));
 
-            match (pushed_right, intervals.last()) {
+            match (pushed_east, intervals.last()) {
                 (true, Some(&(_, (new_east, _)))) => {
                     match self.east((xr,y)) {
                         Some((new_west,_)) => {
