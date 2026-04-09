@@ -36,6 +36,14 @@ pub struct Interpreter {
     current_coordinate: Coordinate
 }
 
+enum CodeState<'a> {
+    ChangeDP,
+    Terminate,
+    Continue(Option<Command<'a>>),
+    ChangeCanvas,
+    Error
+}
+
 impl Interpreter {
     pub fn new() -> Interpreter {
         Interpreter {stack: Vec::new(), dp: DP::East, cc: CC::Left, current_coordinate: (0,0)}
@@ -81,22 +89,22 @@ impl Interpreter {
         self.rotate_dp_right((n-1).rem_euclid(4));
     }
 
-    fn execute_command(&mut self, canvas: &mut Canvas, command: Command) {
+    fn execute_command(&mut self, canvas: &mut Canvas, command: Option<Command>) {
         match command {
-            Command::Push(func) => {
+            Some(Command::Push(func)) => {
                 let result = canvas.get_block_from_coord(self.current_coordinate());
                 match result {
                     Some(block) => func(&mut self.stack(), block.size() as i64),
                     None => ()
                 }
             },
-            Command::StackOps(func) => {
+            Some(Command::StackOps(func)) => {
                 func(&mut self.stack())
             },
-            Command::Interpreter(func) => {
+            Some(Command::Interpreter(func)) => {
                 func(self)
             },
-            Command::InputChar(func) => {
+            Some(Command::InputChar(func)) => {
                 print!("Input char: ");
                 std::io::stdout().flush().expect("Failed to flush");
 
@@ -105,14 +113,14 @@ impl Interpreter {
                 let char = buf.chars().nth(0).expect("No characters were read!");
                 func(&mut self.stack(), char)
             },
-            Command::OutputChar(func) => {
+            Some(Command::OutputChar(func)) => {
                 let result = func(&mut self.stack());
                 match result {
                     Some(character) => print!("{}", character),
                     None => ()
                 }
             },
-            Command::InputNum(func) => {
+            Some(Command::InputNum(func)) => {
                 print!("Input num: ");
                 std::io::stdout().flush().expect("Failed to flush");
                 let mut buf = String::new();
@@ -123,10 +131,11 @@ impl Interpreter {
                     Err(_) => ()
                 }
             },
-            Command::OutputNum(func) => {
+            Some(Command::OutputNum(func)) => {
                 let output = func(&mut self.stack());
                 print!("{}", output)
-            }
+            },
+            None => ()
         }
     }
 
@@ -143,18 +152,18 @@ impl Interpreter {
         }        
     }
 
-    fn try_move_through_white(&mut self, canvas: &mut Canvas) -> bool {
+    fn try_move_through_white<'a>(&mut self, canvas: &mut Canvas) -> CodeState<'a> {
         let mut current_coord = self.current_coordinate();
         let mut visited: Vec<Coordinate> = Vec::new();
         loop {
             if visited.contains(&current_coord) {
-                return false
+                return CodeState::Terminate
             }
 
             match self.try_step_from_white(canvas, current_coord) {
                 Some((coordinate, true)) => {
                     self.update_coordinate(coordinate);
-                    return true
+                    return CodeState::Continue(None)
                 },
                 Some((coordinate, false)) => {
                     visited.push(current_coord);
@@ -184,7 +193,8 @@ impl Interpreter {
             DP::West => canvas.west(coordinate)
         }
     }
-    fn try_move_from_colour(&mut self, canvas: &mut Canvas) -> bool {
+
+    fn try_move_from_colour<'a>(&mut self, canvas: &mut Canvas) -> CodeState<'a> {
         let result = canvas.get_block_from_coord(self.current_coordinate());
         match result {
             Some(block) => {
@@ -193,30 +203,24 @@ impl Interpreter {
                     Some(coord) => {
                         coord
                     },
-                    // Will only be none if you're at the edge of a canvas; in future, this will try to move to a new canvas.
-                    None => return false
+                    None => return CodeState::ChangeCanvas
                 };
-                let next_codel = canvas.get_codel(to_coord);
-                if next_codel.is_black() {
-                    return false
+                if canvas.get_codel(to_coord).is_black() {
+                    return CodeState::ChangeDP
                 }
                 log::debug!("Exit coordinate is {to_coord:?}");
-                match get_command(canvas, from_coord, to_coord) {
-                    Some(command) => self.execute_command(canvas, command),
-                    None => ()
-                };
                 self.update_coordinate(to_coord);
-                return true
+                return CodeState::Continue(get_command(canvas, from_coord, to_coord))
             },
-            None => return false
+            None => return CodeState::Error
         }
     }
 
-    fn step(&mut self, canvas: &mut Canvas) -> bool {
+    fn step<'a>(&mut self, canvas: &mut Canvas) -> CodeState<'a> {
         match canvas.get_codel(self.current_coordinate()) {
             Codel::Black {..} => {
                 log::error!("Interpreter ended up inside a black codel! This should be impossible!");
-                return false
+                return CodeState::Terminate
             },
             Codel::White {..} => {
                 log::debug!("Interpreter stepping from a White block");
@@ -227,18 +231,20 @@ impl Interpreter {
                 log::debug!("Interpreter stepping from a {colour_name} block");
                 log::debug!("Codel chooser points {:?}, direction pointer points {:?}", self.cc(), self.dp());
                 for _ in 1..=4 {
-                    if self.try_move_from_colour(canvas) {
-                        return true
-                    };
-                    self.flip_cc();
-                    log::debug!("Codel chooser flipped {:?}", self.cc());
-                    if self.try_move_from_colour(canvas) {
-                        return true
+                    match self.try_move_from_colour(canvas) {
+                        CodeState::ChangeDP => self.flip_cc(),
+                        CodeState::ChangeCanvas => self.flip_cc(),
+                        other => return other
                     }
-                    self.rotate_dp_right(1);
+                    log::debug!("Codel chooser flipped {:?}", self.cc());
+                    match self.try_move_from_colour(canvas) {
+                        CodeState::ChangeDP => self.rotate_dp_right(1),
+                        CodeState::ChangeCanvas => self.rotate_dp_right(1),
+                        other => return other                    
+                    }
                     log::debug!("Direction pointer rotated {:?}", self.dp());
                 }
-                return false
+                return CodeState::Terminate
             }
         }
     }
@@ -247,8 +253,20 @@ impl Interpreter {
         let mut continue_program = true;
         let mut heartbeats = 0_i64;
         while continue_program && heartbeats < max_heartbeats {
-            continue_program = self.step(canvas);
-            heartbeats += 1;
+            match self.step(canvas) {
+                CodeState::Continue(command) => {
+                    self.execute_command(canvas, command);
+                    heartbeats += 1;
+                },
+                CodeState::Terminate | CodeState::ChangeCanvas => {
+                    log::info!("Program terminated!");
+                    continue_program = false
+                },
+                CodeState::Error|CodeState::ChangeDP => {
+                    log::debug!("Code reached an unreachable state!");
+                    continue_program = false
+                },
+            }
         }
         log::info!("Program terminated after {heartbeats} steps")
     }
