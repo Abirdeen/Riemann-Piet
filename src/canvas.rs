@@ -218,6 +218,20 @@ impl CodelBlock {
         self.index
     }
 
+    pub fn get_coord(&self, dp: DP, cc: CC) -> Coordinate {
+        match (dp, cc) {
+            (DP::North, CC::Left) => {self.northmost_west_coord},
+            (DP::North, CC::Right) => {self.northmost_east_coord},
+            (DP::East, CC::Left) => {self.eastmost_north_coord},
+            (DP::East, CC::Right) => {self.eastmost_south_coord},
+            (DP::South, CC::Left) => {self.southmost_east_coord},
+            (DP::South, CC::Right) => {self.southmost_west_coord},
+            (DP::West, CC::Left) => {self.westmost_south_coord},
+            (DP::West, CC::Right) => {self.westmost_north_coord},
+
+        }
+    }
+
     pub fn northmost_west(&self) -> Coordinate {
         self.northmost_west_coord
     }
@@ -247,8 +261,8 @@ impl CodelBlock {
     }
 
     fn update_northmost(&mut self, coordinate: Coordinate) {
-        let (nwx, nwy) = self.northmost_west();
-        let (nex, _) = self.northmost_east();
+        let (nwx, nwy) = self.get_coord(DP::North, CC::Left);
+        let (nex, _) = self.get_coord(DP::North, CC::Right);
         match coordinate {
             (_,y) if y > nwy => (),
             (_,y) if y < nwy => {
@@ -261,8 +275,8 @@ impl CodelBlock {
         }
     }
     fn update_eastmost(&mut self, coordinate: Coordinate) {
-        let (enx, eny) = self.eastmost_north();
-        let (_, esy) = self.eastmost_south();
+        let (enx, eny) = self.get_coord(DP::East, CC::Left);
+        let (_, esy) = self.get_coord(DP::East, CC::Right);
         match coordinate {
             (x,_) if x < enx => (),
             (x,_) if x > enx => {
@@ -275,8 +289,8 @@ impl CodelBlock {
         }
     }
     fn update_southmost(&mut self, coordinate: Coordinate) {
-        let (swx, swy) = self.southmost_west();
-        let (sex, _) = self.southmost_east();
+        let (swx, swy) = self.get_coord(DP::South, CC::Right);
+        let (sex, _) = self.get_coord(DP::South, CC::Left);
         match coordinate {
             (_,y) if y < swy => (),
             (_,y) if y > swy => {
@@ -289,8 +303,8 @@ impl CodelBlock {
         }
     }
     fn update_westmost(&mut self, coordinate: Coordinate) {
-        let (wnx, wny) = self.westmost_north();
-        let (_, wsy) = self.westmost_south();
+        let (wnx, wny) = self.get_coord(DP::West, CC::Right);
+        let (_, wsy) = self.get_coord(DP::West, CC::Left);
         match coordinate {
             (x,_) if x > wnx => (),
             (x,_) if x < wnx => {
