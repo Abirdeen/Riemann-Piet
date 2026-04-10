@@ -1,10 +1,10 @@
 use std::io::{BufRead, Write};
 use log;
 
-use crate::canvas::{Coordinate, Codel, CodelBlock, Canvas};
+use crate::canvas::{BlockSize, Canvas, Codel, CodelBlock, Coordinate};
 
 pub enum Command<'a> {
-    Push(&'a dyn Fn(&mut Stack, i64) -> ()),
+    Push((BlockSize, &'a dyn Fn(&mut Stack, BlockSize) -> ())),
     StackOps(&'a dyn Fn(&mut Stack) -> ()),
     Interpreter(&'a dyn Fn(&mut Interpreter) -> ()),
     InputNum(&'a dyn Fn(&mut Stack, i64) -> ()),
@@ -22,7 +22,6 @@ pub enum DP {
     South,
     West
 }
-
 #[derive(Debug, Clone, Copy)]
 pub enum CC {
     Left,
@@ -53,7 +52,7 @@ impl Interpreter {
     fn stack(&mut self) -> &mut Stack {
         &mut self.stack
     }
-    fn dp(&self) -> DP {
+    pub fn dp(&self) -> DP {
         self.dp
     }
     fn cc(&self) -> CC {
@@ -88,15 +87,10 @@ impl Interpreter {
         }
         self.rotate_dp_right((n-1).rem_euclid(4));
     }
-
-    fn execute_command(&mut self, canvas: &mut Canvas, command: Option<Command>) {
+    fn execute_command(&mut self, command: Option<Command>) {
         match command {
-            Some(Command::Push(func)) => {
-                let result = canvas.get_block_from_coord(self.current_coordinate());
-                match result {
-                    Some(block) => func(&mut self.stack(), block.size() as i64),
-                    None => ()
-                }
+            Some(Command::Push((block_size, func))) => {
+                func(&mut self.stack(), block_size)
             },
             Some(Command::StackOps(func)) => {
                 func(&mut self.stack())
@@ -275,12 +269,12 @@ impl Interpreter {
 mod commands {
     use std::collections::VecDeque;
 
-    use crate::interpreter::{Interpreter, Stack};
+    use crate::{canvas::BlockSize, interpreter::{Interpreter, Stack}};
 
     // Pushes the number of codels in the previous color block onto the stack.
-    pub fn push(stack: &mut Stack, value: i64) {
+    pub fn push(stack: &mut Stack, value: BlockSize) {
         log::debug!("Pushed {value}");
-        stack.push(value);
+        stack.push(value as i64);
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top value off the stack.
@@ -421,12 +415,13 @@ mod commands {
 
 fn get_command<'a>(canvas: &mut Canvas, from_coord: Coordinate, to_coord: Coordinate) -> Option<Command<'a>> {
     let (from_codel, to_codel) = (*canvas.get_codel(from_coord), *canvas.get_codel(to_coord));
+    let block_size = canvas.get_block_from_coord(from_coord)?.size();
     if !from_codel.is_any_colour() || !to_codel.is_any_colour() {return None}
     let hue_diff =  from_codel.hue_difference(to_codel);
     let lightness_diff = from_codel.light_difference(to_codel);
     match (hue_diff, lightness_diff) {
         (Some(0),Some(0)) => None,
-        (Some(0),Some(1)) => Some(Command::Push(&commands::push)),
+        (Some(0),Some(1)) => Some(Command::Push((block_size, &commands::push))),
         (Some(0),Some(2)) => Some(Command::StackOps(&commands::pop)),
         (Some(1),Some(0)) => Some(Command::StackOps(&commands::add)),
         (Some(1),Some(1)) => Some(Command::StackOps(&commands::subtract)),
@@ -444,5 +439,5 @@ fn get_command<'a>(canvas: &mut Canvas, from_coord: Coordinate, to_coord: Coordi
         (Some(5),Some(1)) => Some(Command::OutputNum(&commands::output_num)),
         (Some(5),Some(2)) => Some(Command::OutputChar(&commands::output_char)),
         _ => None
-}
+    }
 }

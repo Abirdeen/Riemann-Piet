@@ -186,9 +186,12 @@ impl Codel {
 
 }
 
+pub type BlockIndex = usize;
+pub type BlockSize = usize;
+
 #[derive(Debug, Clone)]
 pub struct CodelBlock {
-    index: usize,
+    index: BlockIndex,
     northmost_west_coord: Coordinate,
     northmost_east_coord: Coordinate,
     eastmost_north_coord: Coordinate,
@@ -197,7 +200,7 @@ pub struct CodelBlock {
     southmost_west_coord: Coordinate,
     westmost_south_coord: Coordinate,
     westmost_north_coord: Coordinate,
-    block_size: u32
+    block_size: BlockSize
 }
 
 impl CodelBlock {
@@ -256,7 +259,7 @@ impl CodelBlock {
     pub fn westmost_north(&self) -> Coordinate {
         self.westmost_north_coord
     }
-    pub fn size(&self) -> u32 {
+    pub fn size(&self) -> BlockSize {
         self.block_size
     }
 
