@@ -2,6 +2,7 @@ use std::io::{BufRead, Write};
 use log;
 
 use crate::canvas::{BlockSize, Canvas, Codel, CodelBlock, Coordinate};
+use crate::surface::{Atlas, ChartIndex};
 
 pub enum Command<'a> {
     Push((BlockSize, &'a dyn Fn(&mut Stack, BlockSize) -> ())),
@@ -27,26 +28,63 @@ pub enum CC {
     Left,
     Right
 }
+#[derive(Debug, Clone, Copy)]
+pub enum InterpreterAspect {
+    CC,
+    DP,
+    Both
+}
+
+enum StepState {
+    StepWhite(Coordinate),
+    StepColour(Coordinate),
+    ChangeCanvas,
+    HitBlack
+}
+enum MoveState<'a> {
+    Continue(Option<Command<'a>>),
+    ChangeInterpreterState,
+    ChangeCanvas,
+    Terminate,
+    Error
+}
+pub enum CodeState<'a> {
+    ModifyInterpreter(InterpreterAspect),
+    Continue(Option<Command<'a>>),
+    Terminate,
+    ChangeCanvas(InterpreterAspect),
+    Error
+}
+pub enum ProcessStateOutcome {
+    Continue,
+    CanvasChange(ChartIndex),
+    ModifyInterpreter(InterpreterAspect),
+    Terminate
+}
+
+impl<'a> From<MoveState<'a>> for CodeState<'a> {
+    fn from(value: MoveState<'a>) -> Self {
+        match value {
+            MoveState::Continue(command) => CodeState::Continue(command),
+            MoveState::ChangeCanvas => CodeState::ChangeCanvas(InterpreterAspect::Both),
+            MoveState::ChangeInterpreterState => CodeState::ModifyInterpreter(InterpreterAspect::Both),
+            MoveState::Terminate => CodeState::Terminate,
+            MoveState::Error => CodeState::Error
+        }
+    }
+}
 
 pub struct Interpreter {
     stack: Stack,
     dp: DP,
     cc: CC,
-    current_coordinate: Coordinate
-}
-
-enum CodeState<'a> {
-    ChangeDP,
-    Terminate,
-    Continue(Option<Command<'a>>),
-    ChangeCanvas,
-    Error
+    current_coordinate: Coordinate,
+    reversed: bool
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter {stack: Vec::new(), dp: DP::East, cc: CC::Left, current_coordinate: (0,0)}
-    }
+        Interpreter {stack: Vec::new(), dp: DP::East, cc: CC::Left, current_coordinate: (0,0), reversed: false}
     }
 
     fn stack(&mut self) -> &mut Stack {
@@ -58,13 +96,20 @@ impl Interpreter {
     fn cc(&self) -> CC {
         self.cc
     }
-    fn current_coordinate(&self) -> Coordinate {
+    fn reversed(&self) -> bool {
+        self.reversed
+    }
+    pub fn current_coordinate(&self) -> Coordinate {
         self.current_coordinate
     }
     fn update_coordinate(&mut self, new_coordinate: Coordinate) {
         self.current_coordinate = new_coordinate
     }
 
+    fn reverse(&mut self) {
+        self.flip_cc();
+        self.reversed = !self.reversed
+    }
     fn flip_cc(&mut self) {
         match self.cc() {
             CC::Left => self.cc = CC::Right,
@@ -87,6 +132,37 @@ impl Interpreter {
         }
         self.rotate_dp_right((n-1).rem_euclid(4));
     }
+    fn rotate_dp_left(&mut self, n: i64) {
+        if n.rem_euclid(4)==0 {
+            return ()
+        }
+        match self.dp() {
+            DP::North => {self.dp = DP::West},
+            DP::West => {self.dp = DP::South},
+            DP::South => {self.dp = DP::East},
+            DP::East => {self.dp = DP::North}
+        }
+        self.rotate_dp_right((n-1).rem_euclid(4));
+    }
+    fn rotate_dp(&mut self, n: i64) {
+        if self.reversed {
+            self.rotate_dp_left(n);
+        } else {
+            self.rotate_dp_right(n);
+        }
+    }
+
+    fn modify_interpreter(&mut self, interpreter_aspect: InterpreterAspect) {
+        match interpreter_aspect {
+            InterpreterAspect::CC => self.flip_cc(),
+            InterpreterAspect::DP => self.rotate_dp(1),
+            InterpreterAspect::Both => {
+                self.flip_cc();
+                self.rotate_dp(1);
+            }
+        }
+    }
+
     fn execute_command(&mut self, command: Option<Command>) {
         match command {
             Some(Command::Push((block_size, func))) => {
@@ -133,37 +209,40 @@ impl Interpreter {
         }
     }
 
-    fn try_step_from_white(&self, canvas: &mut Canvas, current_coordinate: Coordinate) -> Option<(Coordinate, bool)> {
+    fn try_step_from_white(&self, canvas: &mut Canvas, current_coordinate: Coordinate) -> StepState {
         match self.next_coords(canvas, current_coordinate) {
             Some(next_coord) => {
                 match canvas.get_codel(next_coord) {
-                    Codel::White {..} => Some((next_coord, false)),
-                    Codel::Colour(_) => Some((next_coord, true)),
-                    Codel::Black {..} => None
+                    Codel::White {..} => StepState::StepWhite(next_coord),
+                    Codel::Colour(_) => StepState::StepColour(next_coord),
+                    Codel::Black {..} => StepState::HitBlack
                 }
             },
-            None => return None
+            None => return StepState::ChangeCanvas
         }        
     }
-
-    fn try_move_through_white<'a>(&mut self, canvas: &mut Canvas) -> CodeState<'a> {
+    fn try_move_through_white<'a>(&mut self, canvas: &mut Canvas) -> MoveState<'a> {
         let mut current_coord = self.current_coordinate();
         let mut visited: Vec<Coordinate> = Vec::new();
         loop {
             if visited.contains(&current_coord) {
-                return CodeState::Terminate
+                return MoveState::Terminate
             }
 
             match self.try_step_from_white(canvas, current_coord) {
-                Some((coordinate, true)) => {
+                StepState::StepColour(coordinate) => {
                     self.update_coordinate(coordinate);
-                    return CodeState::Continue(None)
+                    return MoveState::Continue(None)
                 },
-                Some((coordinate, false)) => {
+                StepState::StepWhite(coordinate) => {
                     visited.push(current_coord);
                     current_coord = coordinate
                 },
-                None => {self.flip_cc(); self.rotate_dp_right(1);}
+                StepState::HitBlack => self.modify_interpreter(InterpreterAspect::Both),
+                StepState::ChangeCanvas => {
+                    self.update_coordinate(current_coord);
+                    return MoveState::ChangeCanvas
+                }
             };
         }
     }
@@ -187,8 +266,7 @@ impl Interpreter {
             DP::West => canvas.west(coordinate)
         }
     }
-
-    fn try_move_from_colour<'a>(&mut self, canvas: &mut Canvas) -> CodeState<'a> {
+    fn try_move_from_colour<'a>(&mut self, canvas: &mut Canvas) -> MoveState<'a> {
         let result = canvas.get_block_from_coord(self.current_coordinate());
         match result {
             Some(block) => {
@@ -197,69 +275,182 @@ impl Interpreter {
                     Some(coord) => {
                         coord
                     },
-                    None => return CodeState::ChangeCanvas
+                    None => return MoveState::ChangeCanvas
                 };
                 if canvas.get_codel(to_coord).is_black() {
-                    return CodeState::ChangeDP
+                    return MoveState::ChangeInterpreterState
                 }
                 log::debug!("Exit coordinate is {to_coord:?}");
                 self.update_coordinate(to_coord);
-                return CodeState::Continue(get_command(canvas, from_coord, to_coord))
+                return MoveState::Continue(get_command(canvas, from_coord, to_coord))
             },
-            None => return CodeState::Error
+            None => return MoveState::Error
         }
     }
 
-    fn step<'a>(&mut self, canvas: &mut Canvas) -> CodeState<'a> {
+    fn get_next_state<'a>(&mut self, canvas: &mut Canvas, interpreter_aspect: InterpreterAspect) -> CodeState<'a> {
         match canvas.get_codel(self.current_coordinate()) {
             Codel::Black {..} => {
                 log::error!("Interpreter ended up inside a black codel! This should be impossible!");
-                return CodeState::Terminate
+                return CodeState::Error
             },
             Codel::White {..} => {
                 log::debug!("Interpreter stepping from a White block");
-                return self.try_move_through_white(canvas)
+                return CodeState::from(self.try_move_through_white(canvas))
             },
             Codel::Colour(colour) => {
                 let colour_name = colour.name();
                 log::debug!("Interpreter stepping from a {colour_name} block");
                 log::debug!("Codel chooser points {:?}, direction pointer points {:?}", self.cc(), self.dp());
-                for _ in 1..=4 {
-                    match self.try_move_from_colour(canvas) {
-                        CodeState::ChangeDP => self.flip_cc(),
-                        CodeState::ChangeCanvas => self.flip_cc(),
-                        other => return other
-                    }
-                    log::debug!("Codel chooser flipped {:?}", self.cc());
-                    match self.try_move_from_colour(canvas) {
-                        CodeState::ChangeDP => self.rotate_dp_right(1),
-                        CodeState::ChangeCanvas => self.rotate_dp_right(1),
-                        other => return other                    
-                    }
-                    log::debug!("Direction pointer rotated {:?}", self.dp());
+                match self.try_move_from_colour(canvas) {
+                    MoveState::ChangeInterpreterState => return CodeState::ModifyInterpreter(interpreter_aspect),
+                    MoveState::ChangeCanvas => return CodeState::ChangeCanvas(interpreter_aspect),
+                    other => return CodeState::from(other)
                 }
-                return CodeState::Terminate
             }
         }
     }
+}
 
-    pub fn run(&mut self, canvas: &mut Canvas, max_heartbeats: i64) {
-        let mut continue_program = true;
-        let mut heartbeats = 0_i64;
-        while continue_program && heartbeats < max_heartbeats {
-            match self.step(canvas) {
-                CodeState::Continue(command) => {
-                    self.execute_command(canvas, command);
+pub trait Interpretable {
+
+    fn process_state(&mut self, interpreter: &mut Interpreter, state: CodeState, canvas_index: ChartIndex) -> ProcessStateOutcome;
+
+    fn run(&mut self, interpreter: &mut Interpreter, max_heartbeats: i64);
+}
+
+impl Interpretable for Canvas {
+
+    fn process_state(&mut self, interpreter: &mut Interpreter, state: CodeState, _: ChartIndex) -> ProcessStateOutcome {
+        match state {
+            CodeState::Continue(command) => {
+                interpreter.execute_command(command);
+                return ProcessStateOutcome::Continue
+            },
+            CodeState::ChangeCanvas(fallback) | CodeState::ModifyInterpreter(fallback) => {
+                interpreter.modify_interpreter(fallback);
+                log::debug!("Modified interpreter state");
+                return ProcessStateOutcome::ModifyInterpreter(fallback)
+            }
+            CodeState::Terminate => {
+                log::info!("Program terminated!");
+                return ProcessStateOutcome::Terminate
+            },
+            CodeState::Error => {
+                log::debug!("Code reached an unreachable state!");
+                return ProcessStateOutcome::Terminate
+            },
+        }
+    }
+
+    fn run(&mut self, interpreter: &mut Interpreter, max_heartbeats: i64) {
+        let mut heartbeats = 0;
+        let mut dp_counter = 0;
+        let mut interpreter_aspect = InterpreterAspect::CC;
+        while heartbeats < max_heartbeats {
+            let state = interpreter.get_next_state(self, interpreter_aspect);
+            match self.process_state(interpreter, state, 0) {
+                ProcessStateOutcome::Continue => {
+                    dp_counter = 0;
+                    interpreter_aspect = InterpreterAspect::CC;
                     heartbeats += 1;
                 },
-                CodeState::Terminate | CodeState::ChangeCanvas => {
-                    log::info!("Program terminated!");
-                    continue_program = false
+                ProcessStateOutcome::ModifyInterpreter(InterpreterAspect::CC) => {
+                    interpreter_aspect = InterpreterAspect::DP;
                 },
-                CodeState::Error|CodeState::ChangeDP => {
-                    log::debug!("Code reached an unreachable state!");
-                    continue_program = false
+                ProcessStateOutcome::ModifyInterpreter(_) => {
+                    dp_counter +=1;
+                    if dp_counter > 3 {
+                        log::debug!("Interpreter could not progress");
+                        break
+                    }
+                    interpreter_aspect = InterpreterAspect::CC;
                 },
+                ProcessStateOutcome::Terminate | ProcessStateOutcome::CanvasChange(_) => {
+                    break
+                }
+            }
+        }
+        log::info!("Program terminated after {heartbeats} steps")        
+    }
+}
+
+impl Interpretable for Atlas {
+    fn process_state(&mut self, interpreter: &mut Interpreter, state: CodeState, index: ChartIndex) -> ProcessStateOutcome {
+        match state {
+            CodeState::Continue(command) => {
+                interpreter.execute_command(command);
+                return ProcessStateOutcome::Continue
+            },
+            CodeState::ChangeCanvas(fallback) => {
+                let transition_map = self.transition_map();
+                match transition_map(interpreter, index) {
+                    Some((new_index, reverse)) => {
+                        match self.transition_coords(interpreter, index, new_index, reverse) {
+                            Some(coordinate) => {
+                                interpreter.update_coordinate(coordinate);
+                                log::debug!("Changed canvas");
+                                if reverse {
+                                    interpreter.reverse();
+                                }
+                                return ProcessStateOutcome::CanvasChange(new_index)
+                            },
+                            None => ()
+                        };
+                    },
+                    None => ()
+                };
+                interpreter.modify_interpreter(fallback);
+                log::debug!("Modified interpreter state");
+                return ProcessStateOutcome::ModifyInterpreter(fallback)
+            },
+            CodeState::ModifyInterpreter(fallback) => {
+                interpreter.modify_interpreter(fallback);
+                log::debug!("Modified interpreter state");
+                return ProcessStateOutcome::ModifyInterpreter(fallback)
+            }
+            CodeState::Terminate => {
+                log::info!("Program terminated!");
+                return ProcessStateOutcome::Terminate
+            },
+            CodeState::Error => {
+                log::debug!("Code reached an unreachable state!");
+                return ProcessStateOutcome::Terminate
+            },
+        }
+    }
+
+    fn run(&mut self, interpreter: &mut Interpreter, max_heartbeats: i64) {
+        let mut heartbeats = 0;
+        let mut dp_counter = 0;
+        let mut interpreter_aspect = InterpreterAspect::CC;
+        let mut current_chart_index = self.origin().index();
+        while heartbeats < max_heartbeats {
+            let current_chart = self.chart_from_index(current_chart_index).expect("Incorrectly updated chart");
+            let state = interpreter.get_next_state(current_chart.canvas(), interpreter_aspect);
+            match self.process_state(interpreter, state, current_chart_index) {
+                ProcessStateOutcome::Continue => {
+                    dp_counter = 0;
+                    interpreter_aspect = InterpreterAspect::CC;
+                    heartbeats += 1;
+                },
+                ProcessStateOutcome::CanvasChange(i) => {
+                    current_chart_index = i;
+                },
+                ProcessStateOutcome::ModifyInterpreter(InterpreterAspect::CC) => {
+                    interpreter_aspect = InterpreterAspect::DP;
+                },
+                ProcessStateOutcome::ModifyInterpreter(_) => {
+                    dp_counter +=1;
+                    if dp_counter > 3 {
+                        log::debug!("Interpreter could not progress");
+                        break
+                    }
+                    interpreter_aspect = InterpreterAspect::CC;
+                },
+                ProcessStateOutcome::Terminate => {
+                    break
+                }
             }
         }
         log::info!("Program terminated after {heartbeats} steps")
@@ -376,7 +567,7 @@ mod commands {
         let stack = interpreter.stack();
         let n = stack.pop().unwrap_or(0);
         log::debug!("Rotated direction pointer by {n}");
-        interpreter.rotate_dp_right(n);
+        interpreter.rotate_dp(n);
     }
     // Pops the top value off the stack, then switches the state of the CC that many times (absolute value if the value is negative).
     pub fn switch(interpreter: &mut Interpreter) -> () {
