@@ -383,6 +383,12 @@ impl Canvas {
         Ok(canvas)
     }
 
+    pub fn width(&self) -> usize {
+        self.dimensions.0
+    }
+    pub fn height(&self) -> usize {
+        self.dimensions.1
+    }
     pub fn dimensions(&self) -> (usize, usize) {
         self.dimensions
     }

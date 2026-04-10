@@ -375,7 +375,7 @@ impl Interpretable for Canvas {
     }
 }
 
-impl Interpretable for Atlas {
+impl<'a> Interpretable for Atlas<'a> {
     fn process_state(&mut self, interpreter: &mut Interpreter, state: CodeState, index: ChartIndex) -> ProcessStateOutcome {
         match state {
             CodeState::Continue(command) => {
