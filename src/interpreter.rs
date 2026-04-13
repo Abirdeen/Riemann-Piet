@@ -4,14 +4,24 @@ use log;
 use crate::canvas::{BlockSize, Canvas, Codel, CodelBlock, Coordinate};
 use crate::surface::{Atlas, ChartIndex};
 
-pub enum Command<'a> {
-    Push((BlockSize, &'a dyn Fn(&mut Stack, BlockSize) -> ())),
-    StackOps(&'a dyn Fn(&mut Stack) -> ()),
-    Interpreter(&'a dyn Fn(&mut Interpreter) -> ()),
-    InputNum(&'a dyn Fn(&mut Stack, i64) -> ()),
-    InputChar(&'a dyn Fn(&mut Stack, char) -> ()),
-    OutputNum(&'a dyn Fn(&mut Stack) -> i64),
-    OutputChar(&'a dyn Fn(&mut Stack)-> Option<char>)
+pub enum PietCommand {
+    Push(BlockSize),
+    Pop,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Modulo,
+    Not,
+    Greater,
+    Pointer,
+    Switch,
+    Duplicate,
+    Roll,
+    InputNum,
+    InputChar,
+    OutputNum,
+    OutputChar
 }
 
 type Stack = Vec<i64>;
@@ -41,16 +51,16 @@ enum StepState {
     ChangeCanvas,
     HitBlack
 }
-enum MoveState<'a> {
-    Continue(Option<Command<'a>>),
+enum MoveState {
+    Continue(Option<PietCommand>),
     ChangeInterpreterState,
     ChangeCanvas,
     Terminate,
     Error
 }
-pub enum CodeState<'a> {
+pub enum CodeState {
     ModifyInterpreter(InterpreterAspect),
-    Continue(Option<Command<'a>>),
+    Continue(Option<PietCommand>),
     Terminate,
     ChangeCanvas(InterpreterAspect),
     Error
@@ -62,8 +72,8 @@ pub enum ProcessStateOutcome {
     Terminate
 }
 
-impl<'a> From<MoveState<'a>> for CodeState<'a> {
-    fn from(value: MoveState<'a>) -> Self {
+impl<'a> From<MoveState> for CodeState {
+    fn from(value: MoveState) -> Self {
         match value {
             MoveState::Continue(command) => CodeState::Continue(command),
             MoveState::ChangeCanvas => CodeState::ChangeCanvas(InterpreterAspect::Both),
@@ -163,47 +173,82 @@ impl Interpreter {
         }
     }
 
-    fn execute_command(&mut self, command: Option<Command>) {
-        match command {
-            Some(Command::Push((block_size, func))) => {
-                func(&mut self.stack(), block_size)
-            },
-            Some(Command::StackOps(func)) => {
-                func(&mut self.stack())
-            },
-            Some(Command::Interpreter(func)) => {
-                func(self)
-            },
-            Some(Command::InputChar(func)) => {
-                print!("Input char: ");
-                std::io::stdout().flush().expect("Failed to flush");
+    fn execute_command(&mut self, maybe_command: Option<PietCommand>) {
+        let stack = self.stack();
+        match maybe_command {
+            Some(piet_command) => {
+                match piet_command {
+                    PietCommand::Push(block_size) => {
+                        commands::push(stack, block_size)
+                    },
+                    PietCommand::Pop => {
+                        commands::pop(stack);
+                    },
+                    PietCommand::Add => {
+                        commands::add(stack);
+                    },
+                    PietCommand::Subtract => {
+                        commands::subtract(stack);
+                    }
+                    PietCommand::Multiply => {
+                        commands::multiply(stack);
+                    },
+                    PietCommand::Divide => {
+                        commands::divide(stack);
+                    },
+                    PietCommand::Modulo => {
+                        commands::modulo(stack);
+                    },
+                    PietCommand::Not => {
+                        commands::not(stack);
+                    },
+                    PietCommand::Greater => {
+                        commands::greater(stack);
+                    },
+                    PietCommand::Pointer => {
+                        commands::pointer(self);
+                    },
+                    PietCommand::Switch => {
+                        commands::switch(self);
+                    },
+                    PietCommand::Duplicate => {
+                        commands::duplicate(stack);
+                    },
+                    PietCommand::Roll => {
+                        commands::roll(stack);
+                    },
+                    PietCommand::InputChar => {
+                        print!("Input char: ");
+                        std::io::stdout().flush().expect("Failed to flush");
 
-                let mut buf = String::new();
-                std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
-                let char = buf.chars().nth(0).expect("No characters were read!");
-                func(&mut self.stack(), char)
-            },
-            Some(Command::OutputChar(func)) => {
-                let result = func(&mut self.stack());
-                match result {
-                    Some(character) => print!("{}", character),
-                    None => ()
+                        let mut buf = String::new();
+                        std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
+                        let char = buf.chars().nth(0).expect("No characters were read!");
+                        commands::input_char(stack, char)
+                    },
+                    PietCommand::OutputChar => {
+                        let result = commands::output_char(&mut self.stack());
+                        match result {
+                            Some(character) => print!("{}", character),
+                            None => ()
+                        }
+                    },
+                    PietCommand::InputNum => {
+                        print!("Input num: ");
+                        std::io::stdout().flush().expect("Failed to flush");
+                        let mut buf = String::new();
+                        std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
+                        let input = buf.trim();
+                        match input.parse::<i64>() {
+                            Ok(val) => commands::input_num(&mut self.stack(), val),
+                            Err(_) => ()
+                        }
+                    },
+                    PietCommand::OutputNum => {
+                        let output = commands::output_num(&mut self.stack());
+                        print!("{}", output)
+                    },
                 }
-            },
-            Some(Command::InputNum(func)) => {
-                print!("Input num: ");
-                std::io::stdout().flush().expect("Failed to flush");
-                let mut buf = String::new();
-                std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
-                let input = buf.trim();
-                match input.parse::<i64>() {
-                    Ok(val) => func(&mut self.stack(), val),
-                    Err(_) => ()
-                }
-            },
-            Some(Command::OutputNum(func)) => {
-                let output = func(&mut self.stack());
-                print!("{}", output)
             },
             None => ()
         }
@@ -221,7 +266,7 @@ impl Interpreter {
             None => return StepState::ChangeCanvas
         }        
     }
-    fn try_move_through_white<'a>(&mut self, canvas: &mut Canvas) -> MoveState<'a> {
+    fn try_move_through_white(&mut self, canvas: &mut Canvas) -> MoveState {
         let mut current_coord = self.current_coordinate();
         let mut visited: Vec<Coordinate> = Vec::new();
         loop {
@@ -266,7 +311,7 @@ impl Interpreter {
             DP::West => canvas.west(coordinate)
         }
     }
-    fn try_move_from_colour<'a>(&mut self, canvas: &mut Canvas) -> MoveState<'a> {
+    fn try_move_from_colour(&mut self, canvas: &mut Canvas) -> MoveState {
         let result = canvas.get_block_from_coord(self.current_coordinate());
         match result {
             Some(block) => {
@@ -288,7 +333,7 @@ impl Interpreter {
         }
     }
 
-    fn get_next_state<'a>(&mut self, canvas: &mut Canvas, interpreter_aspect: InterpreterAspect) -> CodeState<'a> {
+    fn get_next_state(&mut self, canvas: &mut Canvas, interpreter_aspect: InterpreterAspect) -> CodeState {
         match canvas.get_codel(self.current_coordinate()) {
             Codel::Black {..} => {
                 log::error!("Interpreter ended up inside a black codel! This should be impossible!");
@@ -404,10 +449,10 @@ impl<'a> Interpretable for Atlas<'a> {
                 log::debug!("Modified interpreter state");
                 return ProcessStateOutcome::ModifyInterpreter(fallback)
             },
-            CodeState::ModifyInterpreter(fallback) => {
-                interpreter.modify_interpreter(fallback);
+            CodeState::ModifyInterpreter(aspect) => {
+                interpreter.modify_interpreter(aspect);
                 log::debug!("Modified interpreter state");
-                return ProcessStateOutcome::ModifyInterpreter(fallback)
+                return ProcessStateOutcome::ModifyInterpreter(aspect)
             }
             CodeState::Terminate => {
                 log::info!("Program terminated!");
@@ -604,7 +649,7 @@ mod commands {
 
 }
 
-fn get_command<'a>(canvas: &mut Canvas, from_coord: Coordinate, to_coord: Coordinate) -> Option<Command<'a>> {
+fn get_command(canvas: &mut Canvas, from_coord: Coordinate, to_coord: Coordinate) -> Option<PietCommand> {
     let (from_codel, to_codel) = (*canvas.get_codel(from_coord), *canvas.get_codel(to_coord));
     let block_size = canvas.get_block_from_coord(from_coord)?.size();
     if !from_codel.is_any_colour() || !to_codel.is_any_colour() {return None}
@@ -612,23 +657,23 @@ fn get_command<'a>(canvas: &mut Canvas, from_coord: Coordinate, to_coord: Coordi
     let lightness_diff = from_codel.light_difference(to_codel);
     match (hue_diff, lightness_diff) {
         (Some(0),Some(0)) => None,
-        (Some(0),Some(1)) => Some(Command::Push((block_size, &commands::push))),
-        (Some(0),Some(2)) => Some(Command::StackOps(&commands::pop)),
-        (Some(1),Some(0)) => Some(Command::StackOps(&commands::add)),
-        (Some(1),Some(1)) => Some(Command::StackOps(&commands::subtract)),
-        (Some(1),Some(2)) => Some(Command::StackOps(&commands::multiply)),
-        (Some(2),Some(0)) => Some(Command::StackOps(&commands::divide)),
-        (Some(2),Some(1)) => Some(Command::StackOps(&commands::modulo)),
-        (Some(2),Some(2)) => Some(Command::StackOps(&commands::not)),
-        (Some(3),Some(0)) => Some(Command::StackOps(&commands::greater)),
-        (Some(3),Some(1)) => Some(Command::Interpreter(&commands::pointer)),
-        (Some(3),Some(2)) => Some(Command::Interpreter(&commands::switch)),
-        (Some(4),Some(0)) => Some(Command::StackOps(&commands::duplicate)),
-        (Some(4),Some(1)) => Some(Command::StackOps(&commands::roll)),
-        (Some(4),Some(2)) => Some(Command::InputNum(&commands::input_num)),
-        (Some(5),Some(0)) => Some(Command::InputChar(&commands::input_char)),
-        (Some(5),Some(1)) => Some(Command::OutputNum(&commands::output_num)),
-        (Some(5),Some(2)) => Some(Command::OutputChar(&commands::output_char)),
+        (Some(0),Some(1)) => Some(PietCommand::Push(block_size)),
+        (Some(0),Some(2)) => Some(PietCommand::Pop),
+        (Some(1),Some(0)) => Some(PietCommand::Add),
+        (Some(1),Some(1)) => Some(PietCommand::Subtract),
+        (Some(1),Some(2)) => Some(PietCommand::Multiply),
+        (Some(2),Some(0)) => Some(PietCommand::Divide),
+        (Some(2),Some(1)) => Some(PietCommand::Modulo),
+        (Some(2),Some(2)) => Some(PietCommand::Not),
+        (Some(3),Some(0)) => Some(PietCommand::Greater),
+        (Some(3),Some(1)) => Some(PietCommand::Pointer),
+        (Some(3),Some(2)) => Some(PietCommand::Switch),
+        (Some(4),Some(0)) => Some(PietCommand::Duplicate),
+        (Some(4),Some(1)) => Some(PietCommand::Roll),
+        (Some(4),Some(2)) => Some(PietCommand::InputNum),
+        (Some(5),Some(0)) => Some(PietCommand::InputChar),
+        (Some(5),Some(1)) => Some(PietCommand::OutputNum),
+        (Some(5),Some(2)) => Some(PietCommand::OutputChar),
         _ => None
     }
 }
