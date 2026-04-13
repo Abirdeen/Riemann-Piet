@@ -1,4 +1,4 @@
-use crate::{canvas::{Canvas, CanvasError, Coordinate}, interpreter::{self, DP, Interpreter}};
+use crate::{canvas::{Canvas, CanvasError, Coordinate}, interpreter::{DP, Interpreter}};
 
 pub type ChartIndex = usize;
 type ReversalBool = bool;
@@ -86,14 +86,12 @@ impl<'a> Atlas<'a> {
     fn no_transitions(_: &mut Interpreter, _: ChartIndex) -> Option<(ChartIndex, ReversalBool)> {
         return None
     }
-
     fn torus(_: &mut Interpreter, index: ChartIndex) -> Option<(ChartIndex, ReversalBool)> {
         if index > 0 {
             return None
         };
         return Some((0, false))
     }
-
     fn klein_bottle(interpreter: &mut Interpreter, index: ChartIndex) -> Option<(ChartIndex, ReversalBool)> {
         if index > 0 {
             return None
@@ -103,8 +101,7 @@ impl<'a> Atlas<'a> {
             DP::West|DP::East => return Some((0,false))
         }
     }
-
-    fn projective_plane(interpreter: &mut Interpreter, index: ChartIndex) -> Option<(ChartIndex, ReversalBool)> {
+    fn projective_plane(_: &mut Interpreter, index: ChartIndex) -> Option<(ChartIndex, ReversalBool)> {
         if index > 0 {
             return None
         };
