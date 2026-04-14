@@ -411,6 +411,9 @@ impl Canvas {
         let index = self.get_codel(coordinate).block_index()?;
         return Some(&mut self.blocks[index])
     }
+    pub fn get_block_from_index(&mut self, index: BlockIndex) -> Option<&CodelBlock> {
+        return self.blocks.get(index)
+    }
 
     pub fn north(&self, (x,y): Coordinate) -> Option<Coordinate> {
         if self.is_northmost((x,y)) {
