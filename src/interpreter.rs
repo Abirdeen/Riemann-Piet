@@ -3,7 +3,7 @@ use log;
 
 use crate::canvas::{BlockSize, Canvas, Codel, CodelBlock, Coordinate};
 use crate::surface::{Atlas, ChartIndex};
-use crate::palette::text;
+use crate::palette::PietColour;
 
 #[derive(Clone, Copy)]
 pub enum PietCommand {
@@ -189,7 +189,7 @@ pub trait Interpretable {
     fn move_coord(&self, interpreter: &mut Interpreter, coordinate: Coordinate) -> bool;
 
     fn is_white(&self, interpreter: &Interpreter, coordinate: Coordinate) -> bool {
-        self.current_canvas(interpreter).is_colour(coordinate, text::WHITE)
+        self.current_canvas(interpreter).is_colour(coordinate, PietColour::White)
     }
 }
 
@@ -221,7 +221,7 @@ impl Interpretable for Canvas {
             DP::South => (x,y+1),
             DP::West => (x-1,y)
         };
-        if self.is_colour(new_coord, text::BLACK) {
+        if self.is_colour(new_coord, PietColour::Black) {
             return false
         }
         interpreter.update_coordinate(new_coord);
@@ -253,7 +253,7 @@ impl<'a> Interpretable for Atlas<'a> {
                 Some((to_index,reverse)) => {
                     match self.transition_coord(interpreter, from_index, to_index, reverse) {
                         Some(new_coord) => {
-                            if !self.chart(to_index).expect("Mapped to nonexistent chart").canvas().is_colour(new_coord, text::BLACK) {
+                            if !self.chart(to_index).expect("Mapped to nonexistent chart").canvas().is_colour(new_coord, PietColour::Black) {
                                 interpreter.update_chart_index(to_index);
                                 interpreter.update_coordinate(new_coord);
                                 if reverse {
@@ -276,7 +276,7 @@ impl<'a> Interpretable for Atlas<'a> {
             DP::South => (x,y+1),
             DP::West => (x-1,y)
         };
-        if current_canvas.is_colour(new_coord, text::BLACK) {
+        if current_canvas.is_colour(new_coord, PietColour::Black) {
             return false
         }
         interpreter.update_coordinate(new_coord);
@@ -441,7 +441,7 @@ impl Interpreter {
             },
             Codel::Colour(colour) => {
                 let colour_name = colour.name();
-                log::debug!("Interpreter stepping from a {colour_name} block");
+                log::debug!("Interpreter stepping from a {:?} block", colour_name);
                 log::debug!("Codel chooser points {:?}, direction pointer points {:?}", self.cc(), self.dp());
                 match self.try_move_from_colour(artwork) {
                     MoveState::ChangePointerState => return CodeState::ModifyPointer(pointer_aspect),

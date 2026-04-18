@@ -3,7 +3,7 @@ extern crate itertools;
 
 use crate::itertools::Itertools;
 use image::{DynamicImage, GenericImageView};
-use crate::palette;
+use crate::palette::{PietColour, rgba};
 use crate::interpreter::{DP, CC};
 
 pub type CanvasError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -14,7 +14,7 @@ pub struct Colour {
     hue: u8,
     light: u8,
     block_index: Option<usize>,
-    name: &'static str 
+    name: PietColour
 }
 
 impl Colour {
@@ -27,7 +27,7 @@ impl Colour {
     fn block_index(&self) -> Option<usize> {
         self.block_index
     }
-    pub fn name(&self) -> &'static str {
+    pub fn name(&self) -> PietColour {
         self.name
     }
     fn set_block_index(&mut self, new_index: usize) {
@@ -44,76 +44,110 @@ pub enum Codel {
 }
 
 impl Codel {  
-    pub fn new(colour_name: &str) -> Codel {
+    pub fn new(colour_name: PietColour) -> Codel {
         match colour_name {
-            palette::text::WHITE => Codel::White,
-            palette::text::BLACK => Codel::Black,
+            PietColour::White => Codel::White,
+            PietColour::Black => Codel::Black,
 
-            palette::text::LR => Codel::Colour(Colour {hue: 5, light: 0, block_index: None, name: palette::text::LR}),
-            palette::text::R => Codel::Colour(Colour {hue: 5, light: 1, block_index: None, name: palette::text::R}),
-            palette::text::DR => Codel::Colour(Colour {hue: 5, light: 2, block_index: None, name: palette::text::DR}),
+            PietColour::LightRed => Codel::Colour(
+                Colour {hue: 5, light: 0, block_index: None, name: PietColour::LightRed}
+            ),
+            PietColour::Red => Codel::Colour(
+                Colour {hue: 5, light: 1, block_index: None, name: PietColour::Red}
+            ),
+            PietColour::DarkRed => Codel::Colour(
+                Colour {hue: 5, light: 2, block_index: None, name: PietColour::DarkRed}
+            ),
 
-            palette::text::LY => Codel::Colour(Colour {hue: 4, light: 0, block_index: None, name: palette::text::LY}),
-            palette::text::Y => Codel::Colour(Colour {hue: 4, light: 1, block_index: None, name: palette::text::Y}),
-            palette::text::DY => Codel::Colour(Colour {hue: 4, light: 2, block_index: None, name: palette::text::DY}),
+            PietColour::LightYellow => Codel::Colour(
+                Colour {hue: 4, light: 0, block_index: None, name: PietColour::LightYellow}
+            ),
+            PietColour::Yellow => Codel::Colour(
+                Colour {hue: 4, light: 1, block_index: None, name: PietColour::Yellow}
+            ),
+            PietColour::DarkYellow => Codel::Colour(
+                Colour {hue: 4, light: 2, block_index: None, name: PietColour::DarkYellow}
+            ),
 
-            palette::text::LG => Codel::Colour(Colour {hue: 3, light: 0, block_index: None, name: palette::text::LG}),
-            palette::text::G => Codel::Colour(Colour {hue: 3, light: 1, block_index: None, name: palette::text::G}),
-            palette::text::DG => Codel::Colour(Colour {hue: 3, light: 2, block_index: None, name: palette::text::DG}),
+            PietColour::LightGreen => Codel::Colour(
+                Colour {hue: 3, light: 0, block_index: None, name: PietColour::LightGreen}
+            ),
+            PietColour::Green => Codel::Colour(
+                Colour {hue: 3, light: 1, block_index: None, name: PietColour::Green}
+            ),
+            PietColour::DarkGreen => Codel::Colour(
+                Colour {hue: 3, light: 2, block_index: None, name: PietColour::DarkGreen}
+            ),
 
-            palette::text::LC => Codel::Colour(Colour {hue: 2, light: 0, block_index: None, name: palette::text::LC}),
-            palette::text::C => Codel::Colour(Colour {hue: 2, light: 1, block_index: None, name: palette::text::C}),
-            palette::text::DC => Codel::Colour(Colour {hue: 2, light: 2, block_index: None, name: palette::text::DC}),
+            PietColour::LightCyan => Codel::Colour(
+                Colour {hue: 2, light: 0, block_index: None, name: PietColour::LightCyan}
+            ),
+            PietColour::Cyan => Codel::Colour(
+                Colour {hue: 2, light: 1, block_index: None, name: PietColour::Cyan}
+            ),
+            PietColour::DarkCyan => Codel::Colour(
+                Colour {hue: 2, light: 2, block_index: None, name: PietColour::DarkCyan}
+            ),
 
-            palette::text::LB => Codel::Colour(Colour {hue: 1, light: 0, block_index: None, name: palette::text::LB}),
-            palette::text::B => Codel::Colour(Colour {hue: 1, light: 1, block_index: None, name: palette::text::B}),
-            palette::text::DB => Codel::Colour(Colour {hue: 1, light: 2, block_index: None, name: palette::text::DB}),
+            PietColour::LightBlue => Codel::Colour(
+                Colour {hue: 1, light: 0, block_index: None, name: PietColour::LightBlue}
+            ),
+            PietColour::Blue => Codel::Colour(
+                Colour {hue: 1, light: 1, block_index: None, name: PietColour::Blue}
+            ),
+            PietColour::DarkBlue => Codel::Colour(
+                Colour {hue: 1, light: 2, block_index: None, name: PietColour::DarkBlue}
+            ),
 
-            palette::text::LM => Codel::Colour(Colour {hue: 0, light: 0, block_index: None, name: palette::text::LM}),
-            palette::text::M => Codel::Colour(Colour {hue: 0, light: 1, block_index: None, name: palette::text::M}),
-            palette::text::DM => Codel::Colour(Colour {hue: 0, light: 2, block_index: None, name: palette::text::DM}),
-
-            str => panic!("That's not an acceptable colour name: {}. Try again.", str)
+            PietColour::LightMagenta => Codel::Colour(
+                Colour {hue: 0, light: 0, block_index: None, name: PietColour::LightMagenta}
+            ),
+            PietColour::Magenta => Codel::Colour(
+                Colour {hue: 0, light: 1, block_index: None, name: PietColour::Magenta}
+            ),
+            PietColour::DarkMagenta => Codel::Colour(
+                Colour {hue: 0, light: 2, block_index: None, name: PietColour::DarkMagenta}
+            )
         }
     }
 
     fn from_rgba(colour: image::Rgba<u8>) -> Codel {
         match colour {
-            palette::rgba::BLACK => Codel::new(palette::text::BLACK),
-            palette::rgba::WHITE => Codel::new(palette::text::WHITE),
+            rgba::BLACK => Codel::new(PietColour::Black),
+            rgba::WHITE => Codel::new(PietColour::White),
 
-            palette::rgba::LIGHT_RED => Codel::new(palette::text::LR),
-            palette::rgba::RED => Codel::new(palette::text::R),
-            palette::rgba::DARK_RED => Codel::new(palette::text::DR),
+            rgba::LIGHT_RED => Codel::new(PietColour::LightRed),
+            rgba::RED => Codel::new(PietColour::Red),
+            rgba::DARK_RED => Codel::new(PietColour::DarkRed),
 
-            palette::rgba::LIGHT_YELLOW => Codel::new(palette::text::LY),
-            palette::rgba::YELLOW => Codel::new(palette::text::Y),
-            palette::rgba::DARK_YELLOW => Codel::new(palette::text::DY),
+            rgba::LIGHT_YELLOW => Codel::new(PietColour::LightYellow),
+            rgba::YELLOW => Codel::new(PietColour::Yellow),
+            rgba::DARK_YELLOW => Codel::new(PietColour::DarkYellow),
 
-            palette::rgba::LIGHT_GREEN => Codel::new(palette::text::LG),
-            palette::rgba::GREEN => Codel::new(palette::text::G),
-            palette::rgba::DARK_GREEN => Codel::new(palette::text::DG),
+            rgba::LIGHT_GREEN => Codel::new(PietColour::LightGreen),
+            rgba::GREEN => Codel::new(PietColour::Green),
+            rgba::DARK_GREEN => Codel::new(PietColour::DarkGreen),
 
-            palette::rgba::LIGHT_CYAN => Codel::new(palette::text::LC),
-            palette::rgba::CYAN => Codel::new(palette::text::C),
-            palette::rgba::DARK_CYAN => Codel::new(palette::text::DC),
+            rgba::LIGHT_CYAN => Codel::new(PietColour::LightCyan),
+            rgba::CYAN => Codel::new(PietColour::Cyan),
+            rgba::DARK_CYAN => Codel::new(PietColour::DarkCyan),
 
-            palette::rgba::LIGHT_BLUE => Codel::new(palette::text::LB),
-            palette::rgba::BLUE => Codel::new(palette::text::B),
-            palette::rgba::DARK_BLUE => Codel::new(palette::text::DB),
+            rgba::LIGHT_BLUE => Codel::new(PietColour::LightBlue),
+            rgba::BLUE => Codel::new(PietColour::Blue),
+            rgba::DARK_BLUE => Codel::new(PietColour::DarkBlue),
 
-            palette::rgba::LIGHT_MAGENTA => Codel::new(palette::text::LM),
-            palette::rgba::MAGENTA => Codel::new(palette::text::M),
-            palette::rgba::DARK_MAGENTA => Codel::new(palette::text::DM),
+            rgba::LIGHT_MAGENTA => Codel::new(PietColour::LightMagenta),
+            rgba::MAGENTA => Codel::new(PietColour::Magenta),
+            rgba::DARK_MAGENTA => Codel::new(PietColour::DarkMagenta),
 
-            c => {log::warn!("An unrecognised colour was detected: {:?}. These colours are treated as black.", c); Codel::new(palette::text::BLACK)}
+            c => {log::warn!("An unrecognised colour was detected: {:?}. These colours are treated as black.", c); Codel::new(PietColour::Black)}
         }
     }
 
-    pub fn colour_name(&self) -> &'static str {
+    pub fn colour_name(&self) -> PietColour {
         match self {
-            Codel::White {..} => palette::text::WHITE,
-            Codel::Black {..} => palette::text::BLACK,
+            Codel::White {..} => PietColour::White,
+            Codel::Black {..} => PietColour::Black,
             Codel::Colour(colour) => colour.name()
         }
     }
@@ -149,10 +183,10 @@ impl Codel {
         }
     }
 
-    pub fn is_colour(&self, colour_name: &str) -> bool {
+    pub fn is_colour(&self, colour_name: PietColour) -> bool {
         match self {
-            Codel::Black {..} if colour_name == palette::text::BLACK => true,
-            Codel::White {..} if colour_name == palette::text::WHITE => true,
+            Codel::Black {..} if colour_name == PietColour::Black => true,
+            Codel::White {..} if colour_name == PietColour::White => true,
             Codel::Colour(colour) if colour_name == colour.name() => true,
             _ => false
         }
@@ -390,7 +424,7 @@ impl Canvas {
     pub fn get_mut_codel(&mut self, (x,y): Coordinate) -> &mut Codel {
         &mut self.codel_map[x][y]
     }
-    pub fn is_colour(&self, coordinate: Coordinate, colour: &str) -> bool {
+    pub fn is_colour(&self, coordinate: Coordinate, colour: PietColour) -> bool {
         self.get_codel(coordinate).is_colour(colour)
     }
 
@@ -441,7 +475,7 @@ impl Canvas {
         &mut self, 
         block: &mut CodelBlock, 
         coordinate: Coordinate, 
-        colour: &str
+        colour: PietColour
     ) -> (Option<Coordinate>, bool) {
         if !self.is_colour(coordinate, colour) {
             return (None, false)
@@ -469,7 +503,7 @@ impl Canvas {
         &mut self, 
         block: &mut CodelBlock, 
         coordinate: Coordinate, 
-        colour: &str
+        colour: PietColour
     ) -> Option<Coordinate> {
         if !self.is_colour(coordinate, colour) {
             return None
@@ -495,7 +529,7 @@ impl Canvas {
     fn find_disjoint_intervals(
         &mut self,
         block: &mut CodelBlock,
-        colour: &str,
+        colour: PietColour,
         east_boundary: Coordinate,
         west_seed: Coordinate
     ) -> (Vec<(Coordinate, Coordinate)>, bool) {

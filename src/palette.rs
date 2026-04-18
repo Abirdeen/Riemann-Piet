@@ -30,31 +30,32 @@ pub mod rgba {
     pub const DARK_MAGENTA: Rgba<u8> = Rgba::<u8>([192,0,192,255]);
 }
 
-pub mod text {
-    pub const WHITE: &'static str = "White";
-    pub const BLACK: &'static str = "Black";
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PietColour {
+    White,
+    Black,
 
-    pub const LR: &'static str = "Light red";
-    pub const R: &'static str = "Red";
-    pub const DR: &'static str = "Dark red";
+    LightRed,
+    Red,
+    DarkRed,
 
-    pub const LY: &'static str = "Light yellow";
-    pub const Y: &'static str = "Yellow";
-    pub const DY: &'static str = "Dark yellow";
+    LightYellow,
+    Yellow,
+    DarkYellow,
 
-    pub const LG: &'static str = "Light green";
-    pub const G: &'static str = "Green";
-    pub const DG: &'static str = "Dark green";
+    LightGreen,
+    Green,
+    DarkGreen,
 
-    pub const LC: &'static str = "Light cyan";
-    pub const C: &'static str = "Cyan";
-    pub const DC: &'static str = "Dark cyan";
+    LightCyan,
+    Cyan,
+    DarkCyan,
 
-    pub const LB: &'static str = "Light blue";
-    pub const B: &'static str = "Blue";
-    pub const DB: &'static str = "Dark blue";
+    LightBlue,
+    Blue,
+    DarkBlue,
 
-    pub const LM: &'static str = "Light magenta";
-    pub const M: &'static str = "Magenta";
-    pub const DM: &'static str = "Dark magenta";
+    LightMagenta,
+    Magenta,
+    DarkMagenta
 }
