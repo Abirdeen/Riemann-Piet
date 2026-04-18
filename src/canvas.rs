@@ -163,12 +163,6 @@ impl Codel {
             _ => false
         }
     }
-    pub fn is_black(&self) -> bool {
-        match self {
-            Codel::Black {..} => true,
-            _ => false
-        }
-    }
 
     pub fn hue_difference(&self, codel: Codel) -> Option<u8> {
         match (self.hue(), codel.hue()) {
@@ -383,20 +377,11 @@ impl Canvas {
         Ok(canvas)
     }
 
-    pub fn width(&self) -> usize {
-        self.dimensions.0
-    }
-    pub fn height(&self) -> usize {
-        self.dimensions.1
-    }
     pub fn dimensions(&self) -> (usize, usize) {
         self.dimensions
     }
     pub fn coordinates_iter(&self) -> itertools::Product<std::ops::Range<usize>, std::ops::Range<usize>> {
         self.codel_iter.clone()
-    }
-    pub fn blocks_list(&self) -> &Vec<CodelBlock> {
-        &self.blocks
     }
 
     pub fn get_codel(&self, (x,y): Coordinate) -> &Codel {
@@ -409,31 +394,16 @@ impl Canvas {
         self.get_codel(coordinate).is_colour(colour)
     }
 
-    pub fn get_block_from_coord(&self, coordinate: Coordinate) -> Option<&CodelBlock> {
+    pub fn get_block(&self, coordinate: Coordinate) -> Option<&CodelBlock> {
         let index = self.get_codel(coordinate).block_index()?;
         return Some(&self.blocks[index])
     }
-    pub fn get_block_from_index(&mut self, index: BlockIndex) -> Option<&CodelBlock> {
-        return self.blocks.get(index)
-    }
 
-    pub fn north(&self, (x,y): Coordinate) -> Option<Coordinate> {
-        if self.is_northmost((x,y)) {
-            return None
-        }
-        return Some((x, y-1))
-    }
     pub fn east(&self, (x,y): Coordinate) -> Option<Coordinate> {
         if self.is_eastmost((x,y)) {
             return None
         }
         return Some((x+1, y))
-    }
-    pub fn south(&self, (x,y): Coordinate) -> Option<Coordinate> {
-        if self.is_southmost((x,y)) {
-            return None
-        }
-        return Some((x, y+1))
     }
     pub fn west(&self, (x,y): Coordinate) -> Option<Coordinate> {
         if self.is_westmost((x,y)) {

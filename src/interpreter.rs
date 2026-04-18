@@ -162,9 +162,6 @@ impl Interpreter {
         }
     }
 
-    fn reversed(&self) -> bool {
-        self.reversed
-    }
     fn reverse(&mut self) {
         self.flip_cc();
         self.reversed = !self.reversed
@@ -415,7 +412,7 @@ impl Interpreter {
     }
 
     fn try_move_from_colour(&mut self, artwork: &impl Interpretable) -> MoveState {
-        let result = artwork.current_canvas(self).get_block_from_coord(self.current_coordinate());
+        let result = artwork.current_canvas(self).get_block(self.current_coordinate());
         match result {
             Some(block) => {
                 let from_coord = self.get_exit_coords(block);
@@ -660,7 +657,7 @@ fn get_command(artwork: &impl Interpretable, from_index: ChartIndex, from_coord:
     let from_codel = *from_canvas.get_codel(from_coord);
     let to_codel = *artwork.canvas_from_index(to_index)?.get_codel(to_coord);
     if !from_codel.is_any_colour() || !to_codel.is_any_colour() {return None}
-    let block_size = from_canvas.get_block_from_coord(from_coord)?.size();
+    let block_size = from_canvas.get_block(from_coord)?.size();
     let hue_diff =  from_codel.hue_difference(to_codel);
     let lightness_diff = from_codel.light_difference(to_codel);
     match (hue_diff, lightness_diff) {

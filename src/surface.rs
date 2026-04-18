@@ -19,17 +19,8 @@ impl Chart {
     pub fn canvas(&self) -> &Canvas {
         &self.canvas
     }
-    pub fn width(&self) -> usize {
-        self.canvas.width()
-    }
-    pub fn height(&self) -> usize {
-        self.canvas.height()
-    }
     pub fn dimensions(&self) -> (usize, usize) {
         self.canvas.dimensions()
-    }
-    pub fn index(&self) -> ChartIndex {
-        self.index
     }
 }
 
@@ -38,11 +29,8 @@ pub struct Atlas<'a> {
     transition_map: ChartTransition<'a>
 }
 
-impl<'a> Atlas<'a> {
-    pub fn origin(&mut self) -> &mut Chart {
-        &mut self.charts[0]
-    }
-    pub fn transition_map(&self) -> &ChartTransition {
+impl Atlas<'_> {
+    pub fn transition_map(&'_ self) -> &ChartTransition<'_> {
         &self.transition_map
     }
     pub fn chart(&self, index: ChartIndex) -> Option<&Chart> {
