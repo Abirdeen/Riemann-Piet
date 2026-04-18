@@ -3,7 +3,9 @@ use log;
 
 use crate::canvas::{BlockSize, Canvas, Codel, CodelBlock, Coordinate};
 use crate::surface::{Atlas, ChartIndex};
+use crate::palette::text;
 
+#[derive(Clone, Copy)]
 pub enum PietCommand {
     Push(BlockSize),
     Pop,
@@ -24,9 +26,9 @@ pub enum PietCommand {
     OutputChar
 }
 
-type Stack = Vec<i64>;
+type PietStack = Vec<i64>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DP {
     North,
     East,
@@ -39,36 +41,32 @@ pub enum CC {
     Right
 }
 #[derive(Debug, Clone, Copy)]
-pub enum InterpreterAspect {
+pub enum PointerAspect {
     CC,
     DP,
     Both
 }
 
 enum StepState {
-    StepWhite(Coordinate),
-    StepColour(Coordinate),
-    ChangeCanvas,
+    StepWhite,
+    StepColour,
     HitBlack
 }
 enum MoveState {
     Continue(Option<PietCommand>),
-    ChangeInterpreterState,
-    ChangeCanvas,
+    ChangePointerState,
     Terminate,
     Error
 }
 pub enum CodeState {
-    ModifyInterpreter(InterpreterAspect),
+    ModifyPointer(PointerAspect),
     Continue(Option<PietCommand>),
     Terminate,
-    ChangeCanvas(InterpreterAspect),
     Error
 }
 pub enum ProcessStateOutcome {
     Continue,
-    CanvasChange(ChartIndex),
-    ModifyInterpreter(InterpreterAspect),
+    ModifyPointer(PointerAspect),
     Terminate
 }
 
@@ -76,8 +74,7 @@ impl<'a> From<MoveState> for CodeState {
     fn from(value: MoveState) -> Self {
         match value {
             MoveState::Continue(command) => CodeState::Continue(command),
-            MoveState::ChangeCanvas => CodeState::ChangeCanvas(InterpreterAspect::Both),
-            MoveState::ChangeInterpreterState => CodeState::ModifyInterpreter(InterpreterAspect::Both),
+            MoveState::ChangePointerState => CodeState::ModifyPointer(PointerAspect::Both),
             MoveState::Terminate => CodeState::Terminate,
             MoveState::Error => CodeState::Error
         }
@@ -85,50 +82,28 @@ impl<'a> From<MoveState> for CodeState {
 }
 
 pub struct Interpreter {
-    stack: Stack,
+    stack: PietStack,
     dp: DP,
     cc: CC,
     current_coordinate: Coordinate,
+    current_chart_index: ChartIndex,
     reversed: bool
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter {stack: Vec::new(), dp: DP::East, cc: CC::Left, current_coordinate: (0,0), reversed: false}
+        Interpreter {stack: Vec::new(), dp: DP::East, cc: CC::Left, current_coordinate: (0,0), current_chart_index: 0, reversed: false}
+    }
+    pub fn from_data(dp: DP, cc: CC, current_coordinate: Coordinate, current_chart_index: ChartIndex, reversed: bool) -> Interpreter {
+        Interpreter { stack: Vec::new(), dp, cc, current_coordinate, current_chart_index, reversed }
     }
 
-    fn stack(&mut self) -> &mut Stack {
+    fn stack(&mut self) -> &mut PietStack {
         &mut self.stack
     }
+
     pub fn dp(&self) -> DP {
         self.dp
-    }
-    fn cc(&self) -> CC {
-        self.cc
-    }
-    fn reversed(&self) -> bool {
-        self.reversed
-    }
-    pub fn current_coordinate(&self) -> Coordinate {
-        self.current_coordinate
-    }
-    fn update_coordinate(&mut self, new_coordinate: Coordinate) {
-        self.current_coordinate = new_coordinate
-    }
-
-    fn reverse(&mut self) {
-        self.flip_cc();
-        self.reversed = !self.reversed
-    }
-    fn flip_cc(&mut self) {
-        match self.cc() {
-            CC::Left => self.cc = CC::Right,
-            CC::Right => self.cc = CC::Left
-        }        
-    }
-    fn flip_n_cc(&mut self, n: i64) {
-        if n%2==0 {return ()}
-        self.flip_cc();
     }
     fn rotate_dp_right(&mut self, n: i64) {
         if n.rem_euclid(4)==0 {
@@ -162,17 +137,157 @@ impl Interpreter {
         }
     }
 
-    fn modify_interpreter(&mut self, interpreter_aspect: InterpreterAspect) {
-        match interpreter_aspect {
-            InterpreterAspect::CC => self.flip_cc(),
-            InterpreterAspect::DP => self.rotate_dp(1),
-            InterpreterAspect::Both => {
+    pub fn cc(&self) -> CC {
+        self.cc
+    }
+    fn flip_cc(&mut self) {
+        match self.cc() {
+            CC::Left => self.cc = CC::Right,
+            CC::Right => self.cc = CC::Left
+        }        
+    }
+    fn flip_n_cc(&mut self, n: i64) {
+        if n%2==0 {return ()}
+        self.flip_cc();
+    }
+
+    pub fn modify_pointer(&mut self, pointer_aspect: PointerAspect) {
+        match pointer_aspect {
+            PointerAspect::CC => self.flip_cc(),
+            PointerAspect::DP => self.rotate_dp(1),
+            PointerAspect::Both => {
                 self.flip_cc();
                 self.rotate_dp(1);
             }
         }
     }
 
+    fn reversed(&self) -> bool {
+        self.reversed
+    }
+    fn reverse(&mut self) {
+        self.flip_cc();
+        self.reversed = !self.reversed
+    }
+
+    pub fn current_coordinate(&self) -> Coordinate {
+        self.current_coordinate
+    }
+    fn update_coordinate(&mut self, new_coordinate: Coordinate) {
+        self.current_coordinate = new_coordinate
+    }
+    pub fn current_chart_index(&self) -> ChartIndex {
+        self.current_chart_index
+    }
+    fn update_chart_index(&mut self, new_index: ChartIndex) {
+        self.current_chart_index = new_index
+    }
+}
+
+pub trait Interpretable {
+    fn current_canvas(&self, interpreter: &Interpreter) -> &Canvas;
+
+    fn canvas_from_index(&self, index: ChartIndex) -> Option<&Canvas>;
+
+    fn move_coord(&self, interpreter: &mut Interpreter, coordinate: Coordinate) -> bool;
+
+    fn is_white(&self, interpreter: &Interpreter, coordinate: Coordinate) -> bool {
+        self.current_canvas(interpreter).is_colour(coordinate, text::WHITE)
+    }
+}
+
+impl Interpretable for Canvas {
+    
+    fn current_canvas(&self, _: &Interpreter) -> &Canvas {
+        self
+    }
+
+    fn canvas_from_index(&self, _: ChartIndex) -> Option<&Canvas> {
+        Some(self)
+    }
+
+    fn move_coord(&self, interpreter: &mut Interpreter, coordinate: Coordinate) -> bool {
+        let from_boundary = match interpreter.dp() {
+            DP::North => self.is_northmost(coordinate),
+            DP::East => self.is_eastmost(coordinate),
+            DP::South => self.is_southmost(coordinate),
+            DP::West => self.is_westmost(coordinate)
+        };
+        if from_boundary {
+            return false
+        }
+
+        let (x,y) = coordinate;
+        let new_coord = match interpreter.dp() {
+            DP::North => (x,y-1),
+            DP::East => (x+1,y),
+            DP::South => (x,y+1),
+            DP::West => (x-1,y)
+        };
+        if self.is_colour(new_coord, text::BLACK) {
+            return false
+        }
+        interpreter.update_coordinate(new_coord);
+        return true
+    }
+}
+
+impl<'a> Interpretable for Atlas<'a> {
+
+    fn current_canvas(&self, interpreter: &Interpreter) -> &Canvas {
+        self.chart(interpreter.current_chart_index()).expect("Improperly updated chart index").canvas()
+    }
+
+    fn canvas_from_index(&self, index: ChartIndex) -> Option<&Canvas> {
+        Some(self.chart(index)?.canvas())
+    }
+
+    fn move_coord(&self, interpreter: &mut Interpreter, coordinate: Coordinate) -> bool {
+        let current_canvas = self.current_canvas(interpreter);
+        let from_boundary = match interpreter.dp() {
+            DP::North => current_canvas.is_northmost(coordinate),
+            DP::East => current_canvas.is_eastmost(coordinate),
+            DP::South => current_canvas.is_southmost(coordinate),
+            DP::West => current_canvas.is_westmost(coordinate)
+        };
+        if from_boundary {
+            let from_index = interpreter.current_chart_index();
+            match self.transition_map()(interpreter, from_index) {
+                Some((to_index,reverse)) => {
+                    match self.transition_coord(interpreter, from_index, to_index, reverse) {
+                        Some(new_coord) => {
+                            if !self.chart(to_index).expect("Mapped to nonexistent chart").canvas().is_colour(new_coord, text::BLACK) {
+                                interpreter.update_chart_index(to_index);
+                                interpreter.update_coordinate(new_coord);
+                                if reverse {
+                                    interpreter.reverse();
+                                }
+                                return true
+                            }
+                        }, // extremely messy! Needs rewrite.
+                        None => return false,
+                    }
+                },
+                None => return false
+            }
+
+        };
+        let (x,y) = coordinate;
+        let new_coord: Coordinate = match interpreter.dp() {
+            DP::North => (x,y-1),
+            DP::East => (x+1,y),
+            DP::South => (x,y+1),
+            DP::West => (x-1,y)
+        };
+        if current_canvas.is_colour(new_coord, text::BLACK) {
+            return false
+        }
+        interpreter.update_coordinate(new_coord);
+        return true 
+    }
+}
+
+impl Interpreter {
     fn execute_command(&mut self, maybe_command: Option<PietCommand>) {
         let stack = self.stack();
         match maybe_command {
@@ -254,44 +369,39 @@ impl Interpreter {
         }
     }
 
-    fn try_step_from_white(&self, canvas: &mut Canvas, current_coordinate: Coordinate) -> StepState {
-        match self.next_coords(canvas, current_coordinate) {
-            Some(next_coord) => {
-                match canvas.get_codel(next_coord) {
-                    Codel::White {..} => StepState::StepWhite(next_coord),
-                    Codel::Colour(_) => StepState::StepColour(next_coord),
-                    Codel::Black {..} => StepState::HitBlack
-                }
-            },
-            None => return StepState::ChangeCanvas
-        }        
+    fn try_step_from_white(&mut self, artwork: &impl Interpretable, current_coordinate: Coordinate) -> StepState {
+        if !artwork.move_coord(self, current_coordinate) {
+            return StepState::HitBlack
+        }
+
+        if artwork.is_white(self, self.current_coordinate()) {
+            return StepState::StepWhite
+        }
+        return StepState::StepColour  
     }
-    fn try_move_through_white(&mut self, canvas: &mut Canvas) -> MoveState {
-        let mut current_coord = self.current_coordinate();
-        let mut visited: Vec<Coordinate> = Vec::new();
+    fn try_move_through_white(&mut self, artwork: &impl Interpretable) -> MoveState {
+        let mut current_chart: ChartIndex = self.current_chart_index();
+        let mut current_coord: Coordinate = self.current_coordinate();
+        let mut visited: Vec<(ChartIndex, Coordinate, DP)> = Vec::new();
         loop {
-            if visited.contains(&current_coord) {
+            if visited.contains(&(current_chart, current_coord, self.dp())) {
                 return MoveState::Terminate
             }
 
-            match self.try_step_from_white(canvas, current_coord) {
-                StepState::StepColour(coordinate) => {
-                    self.update_coordinate(coordinate);
+            match self.try_step_from_white(artwork, current_coord) {
+                StepState::StepColour => {
                     return MoveState::Continue(None)
                 },
-                StepState::StepWhite(coordinate) => {
-                    visited.push(current_coord);
-                    current_coord = coordinate
+                StepState::StepWhite => {
+                    visited.push((current_chart, current_coord, self.dp()));
+                    current_chart = self.current_chart_index();
+                    current_coord = self.current_coordinate();
                 },
-                StepState::HitBlack => self.modify_interpreter(InterpreterAspect::Both),
-                StepState::ChangeCanvas => {
-                    self.update_coordinate(current_coord);
-                    return MoveState::ChangeCanvas
-                }
+                StepState::HitBlack => self.modify_pointer(PointerAspect::Both)
             };
         }
     }
-    fn get_exit_coords(&self, block: &mut CodelBlock) -> Coordinate {
+    fn get_exit_coords(&self, block: &CodelBlock) -> Coordinate {
         match (self.dp(), self.cc()) {
             (DP::North, CC::Left) => block.northmost_west(),
             (DP::North, CC::Right) => block.northmost_east(),
@@ -303,79 +413,57 @@ impl Interpreter {
             (DP::West, CC::Right) => block.westmost_north()
         }
     }
-    fn next_coords(&self, canvas: &mut Canvas, coordinate: Coordinate) -> Option<Coordinate> {
-        match self.dp() {
-            DP::North => canvas.north(coordinate),
-            DP::East => canvas.east(coordinate),
-            DP::South => canvas.south(coordinate),
-            DP::West => canvas.west(coordinate)
-        }
-    }
-    fn try_move_from_colour(&mut self, canvas: &mut Canvas) -> MoveState {
-        let result = canvas.get_block_from_coord(self.current_coordinate());
+
+    fn try_move_from_colour(&mut self, artwork: &impl Interpretable) -> MoveState {
+        let result = artwork.current_canvas(self).get_block_from_coord(self.current_coordinate());
         match result {
             Some(block) => {
                 let from_coord = self.get_exit_coords(block);
-                let to_coord = match self.next_coords(canvas, from_coord) {
-                    Some(coord) => {
-                        coord
-                    },
-                    None => return MoveState::ChangeCanvas
-                };
-                if canvas.get_codel(to_coord).is_black() {
-                    return MoveState::ChangeInterpreterState
+                let from_index = self.current_chart_index();
+                if !artwork.move_coord(self, from_coord) {
+                    return MoveState::ChangePointerState
                 }
-                log::debug!("Exit coordinate is {to_coord:?}");
-                self.update_coordinate(to_coord);
-                return MoveState::Continue(get_command(canvas, from_coord, to_coord))
+                let to_coord = self.current_coordinate();
+                let to_index = self.current_chart_index();
+
+                return MoveState::Continue(get_command(artwork, from_index, from_coord, to_index, to_coord))
             },
             None => return MoveState::Error
         }
     }
 
-    fn get_next_state(&mut self, canvas: &mut Canvas, interpreter_aspect: InterpreterAspect) -> CodeState {
-        match canvas.get_codel(self.current_coordinate()) {
+    pub fn get_next_state(&mut self, artwork: &impl Interpretable, pointer_aspect: PointerAspect) -> CodeState {
+        match artwork.current_canvas(self).get_codel(self.current_coordinate()) {
             Codel::Black {..} => {
                 log::error!("Interpreter ended up inside a black codel! This should be impossible!");
                 return CodeState::Error
             },
             Codel::White {..} => {
                 log::debug!("Interpreter stepping from a White block");
-                return CodeState::from(self.try_move_through_white(canvas))
+                return CodeState::from(self.try_move_through_white(artwork))
             },
             Codel::Colour(colour) => {
                 let colour_name = colour.name();
                 log::debug!("Interpreter stepping from a {colour_name} block");
                 log::debug!("Codel chooser points {:?}, direction pointer points {:?}", self.cc(), self.dp());
-                match self.try_move_from_colour(canvas) {
-                    MoveState::ChangeInterpreterState => return CodeState::ModifyInterpreter(interpreter_aspect),
-                    MoveState::ChangeCanvas => return CodeState::ChangeCanvas(interpreter_aspect),
+                match self.try_move_from_colour(artwork) {
+                    MoveState::ChangePointerState => return CodeState::ModifyPointer(pointer_aspect),
                     other => return CodeState::from(other)
                 }
             }
         }
     }
-}
 
-pub trait Interpretable {
-
-    fn process_state(&mut self, interpreter: &mut Interpreter, state: CodeState, canvas_index: ChartIndex) -> ProcessStateOutcome;
-
-    fn run(&mut self, interpreter: &mut Interpreter, max_heartbeats: i64);
-}
-
-impl Interpretable for Canvas {
-
-    fn process_state(&mut self, interpreter: &mut Interpreter, state: CodeState, _: ChartIndex) -> ProcessStateOutcome {
+    fn process_state(&mut self, state: CodeState) -> ProcessStateOutcome {
         match state {
             CodeState::Continue(command) => {
-                interpreter.execute_command(command);
+                self.execute_command(command);
                 return ProcessStateOutcome::Continue
             },
-            CodeState::ChangeCanvas(fallback) | CodeState::ModifyInterpreter(fallback) => {
-                interpreter.modify_interpreter(fallback);
+            CodeState::ModifyPointer(fallback) => {
+                self.modify_pointer(fallback);
                 log::debug!("Modified interpreter state");
-                return ProcessStateOutcome::ModifyInterpreter(fallback)
+                return ProcessStateOutcome::ModifyPointer(fallback)
             }
             CodeState::Terminate => {
                 log::info!("Program terminated!");
@@ -388,110 +476,28 @@ impl Interpretable for Canvas {
         }
     }
 
-    fn run(&mut self, interpreter: &mut Interpreter, max_heartbeats: i64) {
+    pub fn run(&mut self, artwork: &impl Interpretable, max_heartbeats: i64) {
         let mut heartbeats = 0;
         let mut dp_counter = 0;
-        let mut interpreter_aspect = InterpreterAspect::CC;
+        let mut pointer_aspect = PointerAspect::CC;
         while heartbeats < max_heartbeats {
-            let state = interpreter.get_next_state(self, interpreter_aspect);
-            match self.process_state(interpreter, state, 0) {
+            let state = self.get_next_state(artwork, pointer_aspect);
+            match self.process_state(state) {
                 ProcessStateOutcome::Continue => {
                     dp_counter = 0;
-                    interpreter_aspect = InterpreterAspect::CC;
+                    pointer_aspect = PointerAspect::CC;
                     heartbeats += 1;
                 },
-                ProcessStateOutcome::ModifyInterpreter(InterpreterAspect::CC) => {
-                    interpreter_aspect = InterpreterAspect::DP;
+                ProcessStateOutcome::ModifyPointer(PointerAspect::CC) => {
+                    pointer_aspect = PointerAspect::DP;
                 },
-                ProcessStateOutcome::ModifyInterpreter(_) => {
+                ProcessStateOutcome::ModifyPointer(_) => {
                     dp_counter +=1;
                     if dp_counter > 3 {
                         log::debug!("Interpreter could not progress");
                         break
                     }
-                    interpreter_aspect = InterpreterAspect::CC;
-                },
-                ProcessStateOutcome::Terminate | ProcessStateOutcome::CanvasChange(_) => {
-                    break
-                }
-            }
-        }
-        log::info!("Program terminated after {heartbeats} steps")        
-    }
-}
-
-impl<'a> Interpretable for Atlas<'a> {
-    fn process_state(&mut self, interpreter: &mut Interpreter, state: CodeState, index: ChartIndex) -> ProcessStateOutcome {
-        match state {
-            CodeState::Continue(command) => {
-                interpreter.execute_command(command);
-                return ProcessStateOutcome::Continue
-            },
-            CodeState::ChangeCanvas(fallback) => {
-                let transition_map = self.transition_map();
-                match transition_map(interpreter, index) {
-                    Some((new_index, reverse)) => {
-                        match self.transition_coords(interpreter, index, new_index, reverse) {
-                            Some(coordinate) => {
-                                interpreter.update_coordinate(coordinate);
-                                log::debug!("Changed canvas");
-                                if reverse {
-                                    interpreter.reverse();
-                                }
-                                return ProcessStateOutcome::CanvasChange(new_index)
-                            },
-                            None => ()
-                        };
-                    },
-                    None => ()
-                };
-                interpreter.modify_interpreter(fallback);
-                log::debug!("Modified interpreter state");
-                return ProcessStateOutcome::ModifyInterpreter(fallback)
-            },
-            CodeState::ModifyInterpreter(aspect) => {
-                interpreter.modify_interpreter(aspect);
-                log::debug!("Modified interpreter state");
-                return ProcessStateOutcome::ModifyInterpreter(aspect)
-            }
-            CodeState::Terminate => {
-                log::info!("Program terminated!");
-                return ProcessStateOutcome::Terminate
-            },
-            CodeState::Error => {
-                log::debug!("Code reached an unreachable state!");
-                return ProcessStateOutcome::Terminate
-            },
-        }
-    }
-
-    fn run(&mut self, interpreter: &mut Interpreter, max_heartbeats: i64) {
-        let mut heartbeats = 0;
-        let mut dp_counter = 0;
-        let mut interpreter_aspect = InterpreterAspect::CC;
-        let mut current_chart_index = self.origin().index();
-        while heartbeats < max_heartbeats {
-            let current_chart = self.chart_from_index(current_chart_index).expect("Incorrectly updated chart");
-            let state = interpreter.get_next_state(current_chart.canvas(), interpreter_aspect);
-            match self.process_state(interpreter, state, current_chart_index) {
-                ProcessStateOutcome::Continue => {
-                    dp_counter = 0;
-                    interpreter_aspect = InterpreterAspect::CC;
-                    heartbeats += 1;
-                },
-                ProcessStateOutcome::CanvasChange(i) => {
-                    current_chart_index = i;
-                },
-                ProcessStateOutcome::ModifyInterpreter(InterpreterAspect::CC) => {
-                    interpreter_aspect = InterpreterAspect::DP;
-                },
-                ProcessStateOutcome::ModifyInterpreter(_) => {
-                    dp_counter +=1;
-                    if dp_counter > 3 {
-                        log::debug!("Interpreter could not progress");
-                        break
-                    }
-                    interpreter_aspect = InterpreterAspect::CC;
+                    pointer_aspect = PointerAspect::CC;
                 },
                 ProcessStateOutcome::Terminate => {
                     break
@@ -502,25 +508,25 @@ impl<'a> Interpretable for Atlas<'a> {
     }
 }
 
-mod commands {
+pub mod commands {
     use std::collections::VecDeque;
 
-    use crate::{canvas::BlockSize, interpreter::{Interpreter, Stack}};
+    use crate::{canvas::BlockSize, interpreter::{Interpreter, PietStack}};
 
     // Pushes the number of codels in the previous color block onto the stack.
-    pub fn push(stack: &mut Stack, value: BlockSize) {
+    pub fn push(stack: &mut PietStack, value: BlockSize) {
         log::debug!("Pushed {value}");
         stack.push(value as i64);
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top value off the stack.
-    pub fn pop(stack: &mut Stack) -> () {
+    pub fn pop(stack: &mut PietStack) -> () {
         log::debug!("Popped from stack");
         stack.pop();
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top two values off the stack, adds them up, and pushes the sum back onto the stack.
-    pub fn add(stack: &mut Stack) -> () {
+    pub fn add(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(0);
         let y = stack.pop().unwrap_or(0);
         log::debug!("Added {x} + {y}");
@@ -528,7 +534,7 @@ mod commands {
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top two values off the stack, subtracts the top value from the second-top value, and pushes the difference back onto the stack. Note that if the top value is X and the next value Y, this means that Y - X will be pushed, not X - Y.
-    pub fn subtract(stack: &mut Stack) -> () {
+    pub fn subtract(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(0);
         let y = stack.pop().unwrap_or(0);
         log::debug!("Subtracted {y} - {x}");
@@ -536,7 +542,7 @@ mod commands {
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top two values off the stack, multiplies them together, and pushes the product back onto the stack.
-    pub fn multiply(stack: &mut Stack) -> () {
+    pub fn multiply(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(0);
         let y = stack.pop().unwrap_or(0);
         log::debug!("Multiplied {x} * {y}");
@@ -544,7 +550,7 @@ mod commands {
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top two values off the stack, performs integer division (Python equivalent of //) on the second-top value divided by the top value, and pushes the quotient back onto the stack. This has the same X/Y property as subtraction.
-    pub fn divide(stack: &mut Stack) -> () {
+    pub fn divide(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(1);
         let y = stack.pop().unwrap_or(0);
         log::debug!("Divided {y} / {x}");
@@ -552,7 +558,7 @@ mod commands {
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top two values off the stack, divided the second-top value by the top value, and pushes the remainder back onto the stack. This has the same X/Y property as subtraction.
-    pub fn modulo(stack: &mut Stack) -> () {
+    pub fn modulo(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(1);
         let y = stack.pop().unwrap_or(0);
         log::debug!("Took {y} mod {x}");
@@ -560,14 +566,14 @@ mod commands {
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top value off the stack. If the value is 0, it pushes 1 onto the stack. Otherwise, it pushes 0.
-    pub fn not(stack: &mut Stack) -> () {
+    pub fn not(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(0);
         log::debug!("Found ¬{x}");
         stack.push(if x==0 {1} else {0});
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top two values off the stack. If the second-top value is greater than the top value, it pushes 1 onto the stack. Otherwise, it pushes 0. This has the same X/Y property as subtraction.
-    pub fn greater(stack: &mut Stack) -> () {
+    pub fn greater(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(1);
         let y = stack.pop().unwrap_or(0);
         log::debug!("Tested {x} < {y}");
@@ -575,7 +581,7 @@ mod commands {
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pushes a copy of the top value onto the stack.
-    pub fn duplicate(stack: &mut Stack) -> () {
+    pub fn duplicate(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(0);
         log::debug!("Duplicated {x}");
         stack.push(x);
@@ -583,7 +589,7 @@ mod commands {
         log::debug!("Resulting stack is {stack:?}")
     }
     // Pops the top two values off the stack, and then rotates the top Y values on the stack up by X, wrapping values that pass the top around to the bottom of the rolled portion, where X is the first value popped (top of the stack), and Y is the second value popped (second on the stack). (Example: If the stack is currently 1,2,3, with 3 at the top, and then you push 3 and then 1, and then roll, the new stack is 3,1,2.)
-    pub fn roll(stack: &mut Stack) -> () {
+    pub fn roll(stack: &mut PietStack) -> () {
         let x = stack.pop().unwrap_or(0);
         let y = stack.pop().unwrap_or(0).min(stack.len() as i64);
 
@@ -622,24 +628,24 @@ mod commands {
         interpreter.flip_n_cc(n);
     }
     // Takes an input, either as a character or a number. If the input is a number, that value is pushed onto the stack. If it's a character, its Unicode value is pushed onto the stack.
-    pub fn input_num(stack: &mut Stack, input: i64) -> () {
+    pub fn input_num(stack: &mut PietStack, input: i64) -> () {
         log::debug!("Took {input} as input");
         stack.push(input);
         log::debug!("Resulting stack is {stack:?}")
     }
-    pub fn input_char(stack: &mut Stack, input: char) -> () {
+    pub fn input_char(stack: &mut PietStack, input: char) -> () {
         log::debug!("Took {input} as input");
         stack.push(input as i64);
         log::debug!("Resulting stack is {stack:?}")
         }
     // Pops the top value off the stack. If a number should be printed, the value itself will be printed. If a character should be printed, then its corresponding Unicode character will be printed.
-    pub fn output_num(stack: &mut Stack) -> i64 {
+    pub fn output_num(stack: &mut PietStack) -> i64 {
         let output = stack.pop().unwrap_or(0);
         log::debug!("Output {output}");
         log::debug!("Resulting stack is {stack:?}");
         return output
     }
-    pub fn output_char(stack: &mut Stack) -> Option<char> {
+    pub fn output_char(stack: &mut PietStack) -> Option<char> {
         let char_int = stack.pop().unwrap_or(0);
         let output = char::from_u32(char_int as u32);
         log::debug!("Output {output:?}");
@@ -649,10 +655,12 @@ mod commands {
 
 }
 
-fn get_command(canvas: &mut Canvas, from_coord: Coordinate, to_coord: Coordinate) -> Option<PietCommand> {
-    let (from_codel, to_codel) = (*canvas.get_codel(from_coord), *canvas.get_codel(to_coord));
-    let block_size = canvas.get_block_from_coord(from_coord)?.size();
+fn get_command(artwork: &impl Interpretable, from_index: ChartIndex, from_coord: Coordinate, to_index: ChartIndex, to_coord: Coordinate) -> Option<PietCommand> {
+    let from_canvas = artwork.canvas_from_index(from_index)?;
+    let from_codel = *from_canvas.get_codel(from_coord);
+    let to_codel = *artwork.canvas_from_index(to_index)?.get_codel(to_coord);
     if !from_codel.is_any_colour() || !to_codel.is_any_colour() {return None}
+    let block_size = from_canvas.get_block_from_coord(from_coord)?.size();
     let hue_diff =  from_codel.hue_difference(to_codel);
     let lightness_diff = from_codel.light_difference(to_codel);
     match (hue_diff, lightness_diff) {
