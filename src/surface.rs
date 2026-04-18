@@ -16,8 +16,8 @@ impl Chart {
         Ok(Chart {canvas, index})
     }
 
-    pub fn canvas(&mut self) -> &mut Canvas {
-        &mut self.canvas
+    pub fn canvas(&self) -> &Canvas {
+        &self.canvas
     }
     pub fn width(&self) -> usize {
         self.canvas.width()
@@ -45,17 +45,17 @@ impl<'a> Atlas<'a> {
     pub fn transition_map(&self) -> &ChartTransition {
         &self.transition_map
     }
-    pub fn chart_from_index(&mut self, index: ChartIndex) -> Option<&mut Chart> {
-        let charts = &mut self.charts;
+    pub fn chart(&self, index: ChartIndex) -> Option<&Chart> {
+        let charts = &self.charts;
         if index >= charts.len() {
             return None
         };
-        return Some(&mut charts[index])
+        return Some(&charts[index])
     }
 
-    pub fn transition_coords(&mut self, interpreter: &mut Interpreter, from_index: ChartIndex, to_index: ChartIndex, reverse: ReversalBool) -> Option<Coordinate> {
-        let (old_chart_width, old_chart_height) = self.chart_from_index(from_index)?.dimensions();
-        let (new_chart_width, new_chart_height) = self.chart_from_index(to_index)?.dimensions();
+    pub fn transition_coord(&self, interpreter: &mut Interpreter, from_index: ChartIndex, to_index: ChartIndex, reverse: ReversalBool) -> Option<Coordinate> {
+        let (old_chart_width, old_chart_height) = self.chart(from_index)?.dimensions();
+        let (new_chart_width, new_chart_height) = self.chart(to_index)?.dimensions();
         let (mut x, mut y) = interpreter.current_coordinate();
         match interpreter.dp() {
             DP::North|DP::South => {

@@ -399,17 +399,19 @@ impl Canvas {
         &self.blocks
     }
 
-    pub fn get_codel(&mut self, coordinate: Coordinate) -> &mut Codel {
-        let (x, y) = coordinate;
+    pub fn get_codel(&self, (x,y): Coordinate) -> &Codel {
+        &self.codel_map[x][y]
+    }
+    pub fn get_mut_codel(&mut self, (x,y): Coordinate) -> &mut Codel {
         &mut self.codel_map[x][y]
     }
-    pub fn is_colour(&mut self, coordinate: Coordinate, colour: &str) -> bool {
+    pub fn is_colour(&self, coordinate: Coordinate, colour: &str) -> bool {
         self.get_codel(coordinate).is_colour(colour)
     }
 
-    pub fn get_block_from_coord(&mut self, coordinate: Coordinate) -> Option<&mut CodelBlock> {
+    pub fn get_block_from_coord(&self, coordinate: Coordinate) -> Option<&CodelBlock> {
         let index = self.get_codel(coordinate).block_index()?;
-        return Some(&mut self.blocks[index])
+        return Some(&self.blocks[index])
     }
     pub fn get_block_from_index(&mut self, index: BlockIndex) -> Option<&CodelBlock> {
         return self.blocks.get(index)
@@ -456,7 +458,7 @@ impl Canvas {
     fn add_coord_to_block(&mut self, block: &mut CodelBlock, coordinate: Coordinate) {
         if !self.get_codel(coordinate).no_index() {return}
         block.add_coordinate(coordinate);
-        self.get_codel(coordinate).set_block_index(block.index());
+        self.get_mut_codel(coordinate).set_block_index(block.index());
     }
     fn add_block(&mut self, block: CodelBlock) {
         self.blocks.push(block);
