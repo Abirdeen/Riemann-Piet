@@ -35,10 +35,28 @@ pub enum DP {
     South,
     West
 }
+impl DP {
+    pub fn rotate(self) -> DP {
+        match self {
+            DP::North => DP::East,
+            DP::East => DP::South,
+            DP::South => DP::West,
+            DP::West => DP::North
+        }
+    }
+}
 #[derive(Debug, Clone, Copy)]
 pub enum CC {
     Left,
     Right
+}
+impl CC {
+    pub fn flip(self) -> CC {
+        match self {
+            CC::Left => CC::Right,
+            CC::Right => CC::Left
+        }
+    }
 }
 #[derive(Debug, Clone, Copy)]
 pub enum PointerAspect {
@@ -64,7 +82,7 @@ pub enum CodeState {
     Terminate,
     Error
 }
-pub enum ProcessStateOutcome {
+enum ProcessStateOutcome {
     Continue,
     ModifyPointer(PointerAspect),
     Terminate
@@ -181,9 +199,9 @@ impl Interpreter {
     }
 }
 
-pub trait Interpretable {
+pub trait Artwork {
+    fn max_chart_index(&self) -> ChartIndex;
     fn current_canvas(&self, interpreter: &Interpreter) -> &Canvas;
-
     fn canvas_from_index(&self, index: ChartIndex) -> Option<&Canvas>;
 
     fn move_coord(&self, interpreter: &mut Interpreter, coordinate: Coordinate) -> bool;
@@ -193,12 +211,14 @@ pub trait Interpretable {
     }
 }
 
-impl Interpretable for Canvas {
+impl Artwork for Canvas {
     
+    fn max_chart_index(&self) -> ChartIndex {
+        1
+    }
     fn current_canvas(&self, _: &Interpreter) -> &Canvas {
         self
     }
-
     fn canvas_from_index(&self, _: ChartIndex) -> Option<&Canvas> {
         Some(self)
     }
@@ -229,14 +249,16 @@ impl Interpretable for Canvas {
     }
 }
 
-impl<'a> Interpretable for Atlas<'a> {
+impl<'a> Artwork for Atlas<'a> {
 
-    fn current_canvas(&self, interpreter: &Interpreter) -> &Canvas {
-        self.chart(interpreter.current_chart_index()).expect("Improperly updated chart index").canvas()
+    fn max_chart_index(&self) -> ChartIndex {
+        self.no_of_charts()
     }
-
+    fn current_canvas(&self, interpreter: &Interpreter) -> &Canvas {
+        self.get_chart(interpreter.current_chart_index()).expect("Improperly updated chart index")
+    }
     fn canvas_from_index(&self, index: ChartIndex) -> Option<&Canvas> {
-        Some(self.chart(index)?.canvas())
+        Some(self.get_chart(index)?)
     }
 
     fn move_coord(&self, interpreter: &mut Interpreter, coordinate: Coordinate) -> bool {
@@ -253,7 +275,7 @@ impl<'a> Interpretable for Atlas<'a> {
                 Some((to_index,reverse)) => {
                     match self.transition_coord(interpreter, from_index, to_index, reverse) {
                         Some(new_coord) => {
-                            if !self.chart(to_index).expect("Mapped to nonexistent chart").canvas().is_colour(new_coord, PietColour::Black) {
+                            if !self.get_chart(to_index).expect("Mapped to nonexistent chart").is_colour(new_coord, PietColour::Black) {
                                 interpreter.update_chart_index(to_index);
                                 interpreter.update_coordinate(new_coord);
                                 if reverse {
@@ -366,7 +388,7 @@ impl Interpreter {
         }
     }
 
-    fn try_step_from_white(&mut self, artwork: &impl Interpretable, current_coordinate: Coordinate) -> StepState {
+    fn try_step_from_white(&mut self, artwork: &impl Artwork, current_coordinate: Coordinate) -> StepState {
         if !artwork.move_coord(self, current_coordinate) {
             return StepState::HitBlack
         }
@@ -376,7 +398,7 @@ impl Interpreter {
         }
         return StepState::StepColour  
     }
-    fn try_move_through_white(&mut self, artwork: &impl Interpretable) -> MoveState {
+    fn try_move_through_white(&mut self, artwork: &impl Artwork) -> MoveState {
         let mut current_chart: ChartIndex = self.current_chart_index();
         let mut current_coord: Coordinate = self.current_coordinate();
         let mut visited: Vec<(ChartIndex, Coordinate, DP)> = Vec::new();
@@ -411,7 +433,7 @@ impl Interpreter {
         }
     }
 
-    fn try_move_from_colour(&mut self, artwork: &impl Interpretable) -> MoveState {
+    fn try_move_from_colour(&mut self, artwork: &impl Artwork) -> MoveState {
         let result = artwork.current_canvas(self).get_block(self.current_coordinate());
         match result {
             Some(block) => {
@@ -429,7 +451,7 @@ impl Interpreter {
         }
     }
 
-    pub fn get_next_state(&mut self, artwork: &impl Interpretable, pointer_aspect: PointerAspect) -> CodeState {
+    pub fn get_next_state(&mut self, artwork: &impl Artwork, pointer_aspect: PointerAspect) -> CodeState {
         match artwork.current_canvas(self).get_codel(self.current_coordinate()) {
             Codel::Black {..} => {
                 log::error!("Interpreter ended up inside a black codel! This should be impossible!");
@@ -473,7 +495,7 @@ impl Interpreter {
         }
     }
 
-    pub fn run(&mut self, artwork: &impl Interpretable, max_heartbeats: i64) {
+    pub fn run(&mut self, artwork: &impl Artwork, max_heartbeats: i64) {
         let mut heartbeats = 0;
         let mut dp_counter = 0;
         let mut pointer_aspect = PointerAspect::CC;
@@ -505,7 +527,7 @@ impl Interpreter {
     }
 }
 
-pub mod commands {
+mod commands {
     use std::collections::VecDeque;
 
     use crate::{canvas::BlockSize, interpreter::{Interpreter, PietStack}};
@@ -648,11 +670,11 @@ pub mod commands {
         log::debug!("Output {output:?}");
         log::debug!("Resulting stack is {stack:?}");
         return output
-        }
+    }
 
 }
 
-fn get_command(artwork: &impl Interpretable, from_index: ChartIndex, from_coord: Coordinate, to_index: ChartIndex, to_coord: Coordinate) -> Option<PietCommand> {
+fn get_command(artwork: &impl Artwork, from_index: ChartIndex, from_coord: Coordinate, to_index: ChartIndex, to_coord: Coordinate) -> Option<PietCommand> {
     let from_canvas = artwork.canvas_from_index(from_index)?;
     let from_codel = *from_canvas.get_codel(from_coord);
     let to_codel = *artwork.canvas_from_index(to_index)?.get_codel(to_coord);

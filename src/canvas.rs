@@ -44,7 +44,7 @@ pub enum Codel {
 }
 
 impl Codel {  
-    pub fn new(colour_name: PietColour) -> Codel {
+    fn new(colour_name: PietColour) -> Codel {
         match colour_name {
             PietColour::White => Codel::White,
             PietColour::Black => Codel::Black,
@@ -144,46 +144,46 @@ impl Codel {
         }
     }
 
-    pub fn colour_name(&self) -> PietColour {
+    fn colour_name(&self) -> PietColour {
         match self {
             Codel::White {..} => PietColour::White,
             Codel::Black {..} => PietColour::Black,
             Codel::Colour(colour) => colour.name()
         }
     }
-    pub fn hue(&self) -> Option<u8> {
+    fn hue(&self) -> Option<u8> {
         match self {
             Codel::Colour(colour) => Some(colour.hue()),
             _ => None
         }
     }
-    pub fn light(&self) -> Option<u8> {
+    fn light(&self) -> Option<u8> {
         match self {
             Codel::Colour(colour) => Some(colour.light()),
             _ => None
         }
     }
-    pub fn block_index(&self) -> Option<usize> {
+    fn block_index(&self) -> Option<usize> {
         match self {
             Codel::Colour(colour) => colour.block_index(),
             _ => None
         }
     }
 
-    pub fn set_block_index(&mut self, new_index: usize) {
+    fn set_block_index(&mut self, new_index: usize) {
         match self {
             Codel::Colour(colour) => colour.set_block_index(new_index),
             _ => ()
         }
     }
-    pub fn no_index(&self) -> bool {
+    fn no_index(&self) -> bool {
         match self {
             Codel::Colour(colour) if colour.block_index() == None => true,
             _ => false
         }
     }
 
-    pub fn is_colour(&self, colour_name: PietColour) -> bool {
+    fn is_colour(&self, colour_name: PietColour) -> bool {
         match self {
             Codel::Black {..} if colour_name == PietColour::Black => true,
             Codel::White {..} if colour_name == PietColour::White => true,
@@ -232,7 +232,7 @@ pub struct CodelBlock {
 }
 
 impl CodelBlock {
-    pub fn new(index: usize, coordinate: Coordinate) -> CodelBlock {
+    fn new(index: usize, coordinate: Coordinate) -> CodelBlock {
         CodelBlock { index, 
             northmost_west_coord: coordinate, 
             northmost_east_coord: coordinate, 
@@ -348,7 +348,7 @@ impl CodelBlock {
         }
     }
 
-    pub fn add_coordinate(&mut self, coordinate: Coordinate) {
+    fn add_coordinate(&mut self, coordinate: Coordinate) {
         self.block_size += 1;
         self.update_northmost(coordinate);
         self.update_eastmost(coordinate);
@@ -414,14 +414,17 @@ impl Canvas {
     pub fn dimensions(&self) -> (usize, usize) {
         self.dimensions
     }
-    pub fn coordinates_iter(&self) -> itertools::Product<std::ops::Range<usize>, std::ops::Range<usize>> {
+    fn coordinates_iter(&self) -> itertools::Product<std::ops::Range<usize>, std::ops::Range<usize>> {
         self.codel_iter.clone()
+    }
+    pub fn blocks(&self) -> &Vec<CodelBlock> {
+        &self.blocks
     }
 
     pub fn get_codel(&self, (x,y): Coordinate) -> &Codel {
         &self.codel_map[x][y]
     }
-    pub fn get_mut_codel(&mut self, (x,y): Coordinate) -> &mut Codel {
+    fn get_mut_codel(&mut self, (x,y): Coordinate) -> &mut Codel {
         &mut self.codel_map[x][y]
     }
     pub fn is_colour(&self, coordinate: Coordinate, colour: PietColour) -> bool {
@@ -433,13 +436,13 @@ impl Canvas {
         return Some(&self.blocks[index])
     }
 
-    pub fn east(&self, (x,y): Coordinate) -> Option<Coordinate> {
+    fn east(&self, (x,y): Coordinate) -> Option<Coordinate> {
         if self.is_eastmost((x,y)) {
             return None
         }
         return Some((x+1, y))
     }
-    pub fn west(&self, (x,y): Coordinate) -> Option<Coordinate> {
+    fn west(&self, (x,y): Coordinate) -> Option<Coordinate> {
         if self.is_westmost((x,y)) {
             return None
         }
@@ -606,7 +609,7 @@ impl Canvas {
             }
         }                
     }
-    pub fn create_blocks(&mut self) {
+    fn create_blocks(&mut self) {
         let mut index = 0;
         for coordinate in self.coordinates_iter().clone() {
             if self.get_codel(coordinate).no_index() {

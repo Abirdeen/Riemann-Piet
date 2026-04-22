@@ -4,46 +4,29 @@ pub type ChartIndex = usize;
 type ReversalBool = bool;
 type ChartTransition<'a> = &'a dyn Fn(&mut Interpreter, ChartIndex) -> Option<(ChartIndex, ReversalBool)>;
 
-pub struct Chart {
-    canvas: Canvas,
-    index: ChartIndex
-}
-
-impl Chart {
-
-    pub fn new(img_path: &str, codel_size: u32, index: ChartIndex) -> Result<Chart, CanvasError> {
-        let canvas = Canvas::new(img_path, codel_size)?;
-        Ok(Chart {canvas, index})
-    }
-
-    pub fn canvas(&self) -> &Canvas {
-        &self.canvas
-    }
-    pub fn dimensions(&self) -> (usize, usize) {
-        self.canvas.dimensions()
-    }
-}
-
 pub struct Atlas<'a> {
-    charts: Vec<Chart>,
+    charts: Vec<Canvas>,
     transition_map: ChartTransition<'a>
 }
 
 impl Atlas<'_> {
-    pub fn transition_map(&'_ self) -> &ChartTransition<'_> {
-        &self.transition_map
+    pub fn transition_map(&'_ self) -> ChartTransition<'_> {
+        self.transition_map
     }
-    pub fn chart(&self, index: ChartIndex) -> Option<&Chart> {
+    pub fn get_chart(&self, index: ChartIndex) -> Option<&Canvas> {
         let charts = &self.charts;
         if index >= charts.len() {
             return None
         };
         return Some(&charts[index])
     }
+    pub fn no_of_charts(&self) -> ChartIndex {
+        self.charts.len()
+    }
 
     pub fn transition_coord(&self, interpreter: &mut Interpreter, from_index: ChartIndex, to_index: ChartIndex, reverse: ReversalBool) -> Option<Coordinate> {
-        let (old_chart_width, old_chart_height) = self.chart(from_index)?.dimensions();
-        let (new_chart_width, new_chart_height) = self.chart(to_index)?.dimensions();
+        let (old_chart_width, old_chart_height) = self.get_chart(from_index)?.dimensions();
+        let (new_chart_width, new_chart_height) = self.get_chart(to_index)?.dimensions();
         let (mut x, mut y) = interpreter.current_coordinate();
         match interpreter.dp() {
             DP::North|DP::South => {
@@ -100,7 +83,7 @@ impl<'a> Atlas<'a> {
         img_path: &str, 
         codel_size: u32
     ) -> Result<Atlas<'a>, CanvasError> {
-        let chart = Chart::new(img_path, codel_size, 0)?;
+        let chart = Canvas::new(img_path, codel_size)?;
         let charts = Vec::from([chart]);
         Ok(Atlas {charts, transition_map: &Atlas::no_transitions})
     }
@@ -108,7 +91,7 @@ impl<'a> Atlas<'a> {
         img_path: &str, 
         codel_size: u32
     ) -> Result<Atlas<'a>, CanvasError> {
-        let chart = Chart::new(img_path, codel_size, 0)?;
+        let chart = Canvas::new(img_path, codel_size)?;
         let charts = Vec::from([chart]);
         Ok(Atlas {charts, transition_map: &Atlas::torus})
     }
@@ -116,7 +99,7 @@ impl<'a> Atlas<'a> {
         img_path: &str, 
         codel_size: u32
     ) -> Result<Atlas<'a>, CanvasError> {
-        let chart = Chart::new(img_path, codel_size, 0)?;
+        let chart = Canvas::new(img_path, codel_size)?;
         let charts = Vec::from([chart]);
         Ok(Atlas {charts, transition_map: &Atlas::klein_bottle})
     }
@@ -124,7 +107,7 @@ impl<'a> Atlas<'a> {
         img_path: &str, 
         codel_size: u32
     ) -> Result<Atlas<'a>, CanvasError> {
-        let chart = Chart::new(img_path, codel_size, 0)?;
+        let chart = Canvas::new(img_path, codel_size)?;
         let charts = Vec::from([chart]);
         Ok(Atlas {charts, transition_map: &Atlas::projective_plane})
     }
