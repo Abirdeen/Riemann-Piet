@@ -33,7 +33,6 @@ fn main() {
 ```
 Every program runnable in [npiet](https://www.bertnase.de/npiet/) should function the same when run as a canvas in Riemann-Piet. If you find an example where the behaviour differs, please get in touch!
 
-
 The unique feature of Riemann-Piet is that a single image can be replaced with with a _surface_, defined by an _atlas_. An atlas is just a collection of images, with a map defining transitions between them. This is sufficient to describe _any_ topological surface, with or without boundaries!
 
 As an example, you can run the interpreter on a [Klein bottle](https://en.wikipedia.org/wiki/Klein_bottle) using the following code:

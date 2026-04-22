@@ -122,7 +122,7 @@ mod pointer_movement {
             assert!(matches!(state, CodeState::Continue(_)));
         }
     }
-
+}
 
 mod piet_commands {
     use crate::canvas::Coordinate;
@@ -155,7 +155,6 @@ mod piet_commands {
             [PietCommand::Duplicate,PietCommand::Roll,PietCommand::InputNum],
             [PietCommand::InputChar,PietCommand::OutputNum,PietCommand::OutputChar]
             ];
-
         for i in 0..6 {
             for j in 0..3 {
                 if (i,j) == (0,0) {
@@ -172,9 +171,6 @@ mod piet_commands {
                 }
             }        
         }
-
-
     }
-
 
 }
