@@ -1,4 +1,5 @@
 # Riemann-Piet
+![Test status](https://github.com/Abirden/Riemann-Piet/actions/workflows/rust.yml/badge.svg)
 A rust-based interpreter for [Piet](https://dangermouse.net/esoteric/piet.html), modified to interpret a general topological surface
 
 ## Installation and usage
