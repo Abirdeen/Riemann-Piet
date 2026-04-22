@@ -5,7 +5,7 @@ use crate::canvas::{BlockSize, Canvas, Codel, CodelBlock, Coordinate};
 use crate::surface::{Atlas, ChartIndex};
 use crate::palette::PietColour;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PietCommand {
     Push(BlockSize),
     Pop,
@@ -188,7 +188,7 @@ impl Interpreter {
     pub fn current_coordinate(&self) -> Coordinate {
         self.current_coordinate
     }
-    fn update_coordinate(&mut self, new_coordinate: Coordinate) {
+    pub fn update_coordinate(&mut self, new_coordinate: Coordinate) {
         self.current_coordinate = new_coordinate
     }
     pub fn current_chart_index(&self) -> ChartIndex {
