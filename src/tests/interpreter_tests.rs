@@ -30,6 +30,7 @@ mod pointer_movement {
     fn simple_cc_choice() {
         let mut interpreter = Interpreter::new();
         interpreter.update_coordinate((1,1));
+        interpreter.modify_pointer(PointerAspect::CC);
         interpreter.get_next_state(&*TEST_CANVAS, PointerAspect::CC);
         let new_coordinate = interpreter.current_coordinate();
         assert_eq!(new_coordinate, (2,2))          
