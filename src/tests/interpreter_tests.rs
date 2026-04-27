@@ -175,3 +175,80 @@ mod piet_commands {
     }
 
 }
+
+mod stackops {
+    use crate::interpreter::{CC, DP, Interpreter, commands};
+
+    #[test]
+    fn basic_operations_work() {
+        let push_stack =  &mut Vec::new();
+        commands::push(push_stack, 10).expect("");
+        assert_eq!(*push_stack, vec![10]);
+
+        let pop_stack =  &mut vec![13, 10];
+        commands::pop(pop_stack).expect("");
+        assert_eq!(*pop_stack, vec![13]);
+
+        let add_stack =  &mut vec![13, 10];
+        commands::add(add_stack).expect("");
+        assert_eq!(*add_stack, vec![23]);
+
+        let subtract_stack =  &mut vec![13, 10];
+        commands::subtract(subtract_stack).expect("");
+        assert_eq!(*subtract_stack, vec![3]);
+
+        let multiply_stack =  &mut vec![13, 10];
+        commands::multiply(multiply_stack).expect("");
+        assert_eq!(*multiply_stack, vec![130]);
+
+        let divide_stack =  &mut vec![13, 10];
+        commands::divide(divide_stack).expect("");
+        assert_eq!(*divide_stack, vec![1]);
+
+        let modulo_stack =  &mut vec![13, 10];
+        commands::modulo(modulo_stack).expect("");
+        assert_eq!(*modulo_stack, vec![3]);
+
+        let not_stack =  &mut vec![13, 10];
+        commands::not(not_stack).expect("");
+        assert_eq!(*not_stack, vec![13, 0]);
+
+        let greater_stack =  &mut vec![13, 10];
+        commands::greater(greater_stack).expect("");
+        assert_eq!(*greater_stack, vec![1]);
+
+        let duplicate_stack =  &mut vec![13, 10];
+        commands::duplicate(duplicate_stack).expect("");
+        assert_eq!(*duplicate_stack, vec![13, 10, 10]);
+    }
+
+    #[test]
+    fn io_works() {
+        let stack = &mut Vec::new();
+        commands::input_char(stack, 'a');
+        assert_eq!(commands::output_char(stack).expect(""), 'a');
+
+        commands::input_num(stack, 7);
+        assert_eq!(commands::output_num(stack).expect(""), 7);
+    }
+
+    #[test]
+    fn pointer_changes_work() {
+        let mut interpreter = Interpreter::new();
+        interpreter.stack().push(2);
+        commands::pointer(&mut interpreter).expect("");
+        assert_eq!(interpreter.dp(), DP::West);
+
+        interpreter.stack().push(3);
+        commands::switch(&mut interpreter).expect("");
+        assert_eq!(interpreter.cc(), CC::Right)
+    }
+
+    #[test]
+    fn roll_works() {
+        let stack = &mut vec![10, 20, 15, 11, 3, 2];
+        commands::roll(stack).expect("");
+        assert_eq!(*stack, vec![10, 11, 20, 15])
+    }
+
+}
