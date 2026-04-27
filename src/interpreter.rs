@@ -45,7 +45,7 @@ impl DP {
         }
     }
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CC {
     Left,
     Right
@@ -105,18 +105,23 @@ pub struct Interpreter {
     cc: CC,
     current_coordinate: Coordinate,
     current_chart_index: ChartIndex,
-    reversed: bool
+    reversed: bool,
+    suppress_panics: bool
 }
 
 impl Interpreter {
     pub fn new() -> Interpreter {
-        Interpreter {stack: Vec::new(), dp: DP::East, cc: CC::Left, current_coordinate: (0,0), current_chart_index: 0, reversed: false}
+        Interpreter {stack: Vec::new(), dp: DP::East, cc: CC::Left, current_coordinate: (0,0), current_chart_index: 0, reversed: false, suppress_panics: false}
     }
     pub fn from_data(dp: DP, cc: CC, current_coordinate: Coordinate, current_chart_index: ChartIndex, reversed: bool) -> Interpreter {
-        Interpreter { stack: Vec::new(), dp, cc, current_coordinate, current_chart_index, reversed }
+        Interpreter { stack: Vec::new(), dp, cc, current_coordinate, current_chart_index, reversed, suppress_panics: false }
     }
 
-    fn stack(&mut self) -> &mut PietStack {
+    pub fn suppress_panics(&mut self) {
+        self.suppress_panics = true
+    }
+
+    pub fn stack(&mut self) -> &mut PietStack {
         &mut self.stack
     }
 
@@ -307,7 +312,7 @@ impl<'a> Artwork for Atlas<'a> {
 }
 
 impl Interpreter {
-    fn execute_command(&mut self, maybe_command: Option<PietCommand>) {
+    fn execute_command(&mut self, maybe_command: Option<PietCommand>) -> Result<(), ()> {
         let stack = self.stack();
         match maybe_command {
             Some(piet_command) => {
@@ -316,40 +321,40 @@ impl Interpreter {
                         commands::push(stack, block_size)
                     },
                     PietCommand::Pop => {
-                        commands::pop(stack);
+                        commands::pop(stack)
                     },
                     PietCommand::Add => {
-                        commands::add(stack);
+                        commands::add(stack)
                     },
                     PietCommand::Subtract => {
-                        commands::subtract(stack);
+                        commands::subtract(stack)
                     }
                     PietCommand::Multiply => {
-                        commands::multiply(stack);
+                        commands::multiply(stack)
                     },
                     PietCommand::Divide => {
-                        commands::divide(stack);
+                        commands::divide(stack)
                     },
                     PietCommand::Modulo => {
-                        commands::modulo(stack);
+                        commands::modulo(stack)
                     },
                     PietCommand::Not => {
-                        commands::not(stack);
+                        commands::not(stack)
                     },
                     PietCommand::Greater => {
-                        commands::greater(stack);
+                        commands::greater(stack)
                     },
                     PietCommand::Pointer => {
-                        commands::pointer(self);
+                        commands::pointer(self)
                     },
                     PietCommand::Switch => {
-                        commands::switch(self);
+                        commands::switch(self)
                     },
                     PietCommand::Duplicate => {
-                        commands::duplicate(stack);
+                        commands::duplicate(stack)
                     },
                     PietCommand::Roll => {
-                        commands::roll(stack);
+                        commands::roll(stack)
                     },
                     PietCommand::InputChar => {
                         print!("Input char: ");
@@ -358,14 +363,12 @@ impl Interpreter {
                         let mut buf = String::new();
                         std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
                         let char = buf.chars().nth(0).expect("No characters were read!");
-                        commands::input_char(stack, char)
+                        commands::input_char(stack, char);
+                        Ok(())
                     },
                     PietCommand::OutputChar => {
-                        let result = commands::output_char(&mut self.stack());
-                        match result {
-                            Some(character) => print!("{}", character),
-                            None => ()
-                        }
+                        print!("{}", commands::output_char(&mut self.stack())?);
+                        Ok(())
                     },
                     PietCommand::InputNum => {
                         print!("Input num: ");
@@ -374,17 +377,20 @@ impl Interpreter {
                         std::io::stdin().lock().read_line(&mut buf).expect("Failed to read line");
                         let input = buf.trim();
                         match input.parse::<i64>() {
-                            Ok(val) => commands::input_num(&mut self.stack(), val),
-                            Err(_) => ()
+                            Ok(val) => {
+                                commands::input_num(&mut self.stack(), val);
+                                Ok(())
+                            },
+                            Err(_) => Err(())
                         }
                     },
                     PietCommand::OutputNum => {
-                        let output = commands::output_num(&mut self.stack());
-                        print!("{}", output)
+                        print!("{}", commands::output_num(&mut self.stack())?);
+                        Ok(())
                     },
                 }
             },
-            None => ()
+            None => Ok(())
         }
     }
 
@@ -476,8 +482,14 @@ impl Interpreter {
     fn process_state(&mut self, state: CodeState) -> ProcessStateOutcome {
         match state {
             CodeState::Continue(command) => {
-                self.execute_command(command);
-                return ProcessStateOutcome::Continue
+                match self.execute_command(command) {
+                    Err(()) if !self.suppress_panics => {
+                        log::error!("Failed to execute command, terminating program");
+                        return ProcessStateOutcome::Terminate
+                    }
+                    _ => return ProcessStateOutcome::Continue
+
+                }
             },
             CodeState::ModifyPointer(fallback) => {
                 self.modify_pointer(fallback);
@@ -527,96 +539,193 @@ impl Interpreter {
     }
 }
 
-mod commands {
+pub mod commands {
     use std::collections::VecDeque;
 
     use crate::{canvas::BlockSize, interpreter::{Interpreter, PietStack}};
 
     // Pushes the number of codels in the previous color block onto the stack.
-    pub fn push(stack: &mut PietStack, value: BlockSize) {
+    pub fn push(stack: &mut PietStack, value: BlockSize) -> Result<(), ()> {
+        if value > i64::MAX as usize {
+            log::warn!("Value was larger than i64::MAX, so couldn't be pushed.");
+            return Err(())
+        }
         log::debug!("Pushed {value}");
         stack.push(value as i64);
-        log::debug!("Resulting stack is {stack:?}")
+        log::debug!("Resulting stack is {stack:?}");
+        return Ok(())
     }
     // Pops the top value off the stack.
-    pub fn pop(stack: &mut PietStack) -> () {
+    pub fn pop(stack: &mut PietStack) -> Result<(), ()> {
+        if stack.is_empty() {
+            log::warn!("Popped from empty stack");
+            return Err(())
+        }
         log::debug!("Popped from stack");
         stack.pop();
-        log::debug!("Resulting stack is {stack:?}")
+        log::debug!("Resulting stack is {stack:?}");
+        return Ok(())
     }
     // Pops the top two values off the stack, adds them up, and pushes the sum back onto the stack.
-    pub fn add(stack: &mut PietStack) -> () {
+    pub fn add(stack: &mut PietStack) -> Result<(), ()> {
+        let started_empty = stack.is_empty();
+        let stack_too_small = stack.len() < 2;
         let x = stack.pop().unwrap_or(0);
         let y = stack.pop().unwrap_or(0);
-        log::debug!("Added {x} + {y}");
         stack.push(x+y);
-        log::debug!("Resulting stack is {stack:?}")
+        if started_empty {
+            log::warn!("Added on empty stack");
+            return Err(())
+        } else if stack_too_small {
+            log::warn!("Added when stack contained only one value");
+            return Err(())
+        } else {
+            log::debug!("Added {x} + {y}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(())
+        }
     }
     // Pops the top two values off the stack, subtracts the top value from the second-top value, and pushes the difference back onto the stack. Note that if the top value is X and the next value Y, this means that Y - X will be pushed, not X - Y.
-    pub fn subtract(stack: &mut PietStack) -> () {
+    pub fn subtract(stack: &mut PietStack) -> Result<(), ()> {
+        let started_empty = stack.is_empty();
+        let stack_too_small = stack.len() < 2;
         let x = stack.pop().unwrap_or(0);
         let y = stack.pop().unwrap_or(0);
-        log::debug!("Subtracted {y} - {x}");
         stack.push(y-x);
-        log::debug!("Resulting stack is {stack:?}")
+        if started_empty {
+            log::warn!("Subtracted on empty stack");
+            return Err(())
+        } else if stack_too_small {
+            log::warn!("Subtracted when stack contained only one value");
+            return Err(())
+        } else {
+            log::debug!("Subtracted {y} - {x}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(())
+        }
     }
     // Pops the top two values off the stack, multiplies them together, and pushes the product back onto the stack.
-    pub fn multiply(stack: &mut PietStack) -> () {
+    pub fn multiply(stack: &mut PietStack) -> Result<(), ()> {
+        let started_empty = stack.is_empty();
+        let stack_too_small = stack.len() < 2;
         let x = stack.pop().unwrap_or(0);
         let y = stack.pop().unwrap_or(0);
-        log::debug!("Multiplied {x} * {y}");
         stack.push(x*y);
-        log::debug!("Resulting stack is {stack:?}")
+        if started_empty {
+            log::warn!("Multiplied on empty stack");
+            return Err(())
+        } else if stack_too_small {
+            log::warn!("Multiplied when stack contained only one value");
+            return Err(())
+        } else {
+            log::debug!("Multiplied {x} * {y}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(())
+        }
     }
     // Pops the top two values off the stack, performs integer division (Python equivalent of //) on the second-top value divided by the top value, and pushes the quotient back onto the stack. This has the same X/Y property as subtraction.
-    pub fn divide(stack: &mut PietStack) -> () {
+    pub fn divide(stack: &mut PietStack) -> Result<(), ()> {
+        let started_empty = stack.is_empty();
+        let stack_too_small = stack.len() < 2;
         let x = stack.pop().unwrap_or(1);
         let y = stack.pop().unwrap_or(0);
-        log::debug!("Divided {y} / {x}");
         stack.push(y/x);
-        log::debug!("Resulting stack is {stack:?}")
+        if started_empty {
+            log::warn!("Divided on empty stack");
+            return Err(())
+        } else if stack_too_small {
+            log::warn!("Divided when stack contained only one value");
+            return Err(())
+        } else {
+            log::debug!("Divided {y} / {x}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(())
+        }
     }
     // Pops the top two values off the stack, divided the second-top value by the top value, and pushes the remainder back onto the stack. This has the same X/Y property as subtraction.
-    pub fn modulo(stack: &mut PietStack) -> () {
+    pub fn modulo(stack: &mut PietStack) -> Result<(), ()> {
+        let started_empty = stack.is_empty();
+        let stack_too_small = stack.len() < 2;
         let x = stack.pop().unwrap_or(1);
         let y = stack.pop().unwrap_or(0);
-        log::debug!("Took {y} mod {x}");
         stack.push(y.rem_euclid(x));
-        log::debug!("Resulting stack is {stack:?}")
+        if started_empty {
+            log::warn!("Took remainder on empty stack");
+            return Err(())
+        } else if stack_too_small {
+            log::warn!("Took remainder when stack contained only one value");
+            return Err(())
+        } else {
+            log::debug!("Took {y} mod {x}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(())
+        }
     }
     // Pops the top value off the stack. If the value is 0, it pushes 1 onto the stack. Otherwise, it pushes 0.
-    pub fn not(stack: &mut PietStack) -> () {
+    pub fn not(stack: &mut PietStack) -> Result<(), ()> {
+        let started_empty = stack.is_empty();
         let x = stack.pop().unwrap_or(0);
-        log::debug!("Found ¬{x}");
-        stack.push(if x==0 {1} else {0});
-        log::debug!("Resulting stack is {stack:?}")
+        stack.push((x==0) as i64);
+        if started_empty {
+            log::warn!("Performed logical not on empty stack");
+            return Err(())
+        } else {
+            log::debug!("Found ¬{x}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(())           
+        }
     }
     // Pops the top two values off the stack. If the second-top value is greater than the top value, it pushes 1 onto the stack. Otherwise, it pushes 0. This has the same X/Y property as subtraction.
-    pub fn greater(stack: &mut PietStack) -> () {
+    pub fn greater(stack: &mut PietStack) -> Result<(), ()> {
+        let started_empty = stack.is_empty();
+        let stack_too_small = stack.len() < 2;
         let x = stack.pop().unwrap_or(1);
         let y = stack.pop().unwrap_or(0);
-        log::debug!("Tested {x} < {y}");
-        stack.push(if x<y {1} else {0});
-        log::debug!("Resulting stack is {stack:?}")
+        stack.push((x<y) as i64);
+        if started_empty {
+            log::warn!("Compared values on empty stack");
+            return Err(())
+        } else if stack_too_small {
+            log::warn!("Compared values when stack contained only one value");
+            return Err(())
+        } else {
+            log::debug!("Tested {x} < {y}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(())
+        }
     }
     // Pushes a copy of the top value onto the stack.
-    pub fn duplicate(stack: &mut PietStack) -> () {
+    pub fn duplicate(stack: &mut PietStack) -> Result<(), ()> {
+        let started_empty = stack.is_empty();
         let x = stack.pop().unwrap_or(0);
-        log::debug!("Duplicated {x}");
         stack.push(x);
         stack.push(x);
-        log::debug!("Resulting stack is {stack:?}")
+        if started_empty {
+            log::warn!("Duplicated on empty stack");
+            return Err(())
+        } else {
+            log::debug!("Duplicated {x}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(())          
+        }
     }
     // Pops the top two values off the stack, and then rotates the top Y values on the stack up by X, wrapping values that pass the top around to the bottom of the rolled portion, where X is the first value popped (top of the stack), and Y is the second value popped (second on the stack). (Example: If the stack is currently 1,2,3, with 3 at the top, and then you push 3 and then 1, and then roll, the new stack is 3,1,2.)
-    pub fn roll(stack: &mut PietStack) -> () {
+    pub fn roll(stack: &mut PietStack) -> Result<(), ()> {
+        if stack.is_empty() {
+            log::warn!("Attempted to roll on empty stack");
+            return Err(())
+        }
         let x = stack.pop().unwrap_or(0);
+        if stack.is_empty() {
+            log::warn!("Attempted to roll on stack with only one value");
+            return Err(())            
+        }
         let y = stack.pop().unwrap_or(0).min(stack.len() as i64);
 
         if y==0 {
             log::debug!("Rolled zero values");
-            return ()
+            return Ok(())
         }
-        log::debug!("Rolled {y} values by {x}");
         let mut vals: VecDeque<i64> = VecDeque::new();
         for _i in 0..y {
             // Justify: by construction of y, we should never pop more than the full stack
@@ -630,46 +739,84 @@ mod commands {
         for _i in 0..vals.len() {
             stack.push(vals.pop_back().unwrap_or(0));
         }
-        log::debug!("Resulting stack is {stack:?}")
+        log::debug!("Rolled {y} values by {x}");
+        log::debug!("Resulting stack is {stack:?}");
+        return Ok(())
     }
     // Pops the top value off the stack, then rotates the DP one step clockwise that many times (anti-clockwise if the value is negative).
-    pub fn pointer(interpreter: &mut Interpreter) -> () {
+    pub fn pointer(interpreter: &mut Interpreter) -> Result<(), ()> {
         let stack = interpreter.stack();
+        let started_empty = stack.is_empty();
         let n = stack.pop().unwrap_or(0);
-        log::debug!("Rotated direction pointer by {n}");
         interpreter.rotate_dp(n);
+        if started_empty {
+            log::warn!("Rotated pointer on empty stack");
+            return Err(())
+        } else {
+            log::debug!("Rotated direction pointer by {n}");
+            return Ok(())          
+        }
     }
     // Pops the top value off the stack, then switches the state of the CC that many times (absolute value if the value is negative).
-    pub fn switch(interpreter: &mut Interpreter) -> () {
+    pub fn switch(interpreter: &mut Interpreter) -> Result<(), ()> {
         let stack = interpreter.stack();
+        let started_empty = stack.is_empty();
         let n = stack.pop().unwrap_or(0);
-        log::debug!("Flipped codel chooser by {n}");
         interpreter.flip_n_cc(n);
+        if started_empty {
+            log::warn!("Flipped codel chooser with empty stack");
+            return Err(())
+        } else {
+            log::debug!("Flipped codel chooser by {n}");
+            return Ok(())          
+        }
     }
     // Takes an input, either as a character or a number. If the input is a number, that value is pushed onto the stack. If it's a character, its Unicode value is pushed onto the stack.
     pub fn input_num(stack: &mut PietStack, input: i64) -> () {
-        log::debug!("Took {input} as input");
         stack.push(input);
+        log::debug!("Took {input} as input");
         log::debug!("Resulting stack is {stack:?}")
     }
     pub fn input_char(stack: &mut PietStack, input: char) -> () {
-        log::debug!("Took {input} as input");
         stack.push(input as i64);
+        log::debug!("Took {input} as input");
         log::debug!("Resulting stack is {stack:?}")
         }
     // Pops the top value off the stack. If a number should be printed, the value itself will be printed. If a character should be printed, then its corresponding Unicode character will be printed.
-    pub fn output_num(stack: &mut PietStack) -> i64 {
+    pub fn output_num(stack: &mut PietStack) -> Result<i64, ()> {
+        let started_empty = stack.is_empty();
         let output = stack.pop().unwrap_or(0);
-        log::debug!("Output {output}");
-        log::debug!("Resulting stack is {stack:?}");
-        return output
+        if started_empty {
+            log::warn!("Output on empty stack");
+            return Err(())
+        } else {            
+            log::debug!("Output {output}");
+            log::debug!("Resulting stack is {stack:?}");
+            return Ok(output)
+        }
     }
-    pub fn output_char(stack: &mut PietStack) -> Option<char> {
+    pub fn output_char(stack: &mut PietStack) -> Result<char, ()> {
+        let started_empty = stack.is_empty();
         let char_int = stack.pop().unwrap_or(0);
-        let output = char::from_u32(char_int as u32);
-        log::debug!("Output {output:?}");
-        log::debug!("Resulting stack is {stack:?}");
-        return output
+        if started_empty {
+            log::warn!("Output on empty stack");
+            return Err(())            
+        }
+        if char_int > u32::MAX as i64 {
+            log::warn!("Top stack value was larger than u32::MAX, so couldn't interpreted as a character");
+            return Err(())
+        }
+        match char::from_u32(char_int as u32) {
+            Some(char) => {
+                log::debug!("Output {char:?}");
+                log::debug!("Resulting stack is {stack:?}");
+                return Ok(char)
+            },
+            None => {
+                log::warn!("Top stack value did not represent valid character");
+                return Err(())
+            }
+        }
     }
 
 }
